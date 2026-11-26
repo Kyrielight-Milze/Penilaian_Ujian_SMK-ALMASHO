@@ -456,13 +456,11 @@ final class LoginScreen extends Page {
     private static final class Banner extends JPanel {
         private final Supplier<Color> fill;
         private final Supplier<Color> tone;
-        private final String glyph;
 
         Banner(Supplier<Color> fill, Supplier<Color> tone, String glyph, JComponent content) {
             super(new BorderLayout(12, 0));
             this.fill = fill;
             this.tone = tone;
-            this.glyph = glyph;
             setOpaque(false);
             setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
             JComponent icon = new JComponent() {

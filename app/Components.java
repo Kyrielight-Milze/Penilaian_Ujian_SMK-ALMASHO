@@ -2,23 +2,162 @@ package app;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.*;
 import java.awt.geom.Arc2D;
 import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
-import java.util.function.Supplier;
 
 import static app.Theme.f;
 import static app.Theme.fb;
 import static app.Theme.quality;
 import static app.Ui.*;
 
-/** Komponen tampilan kustom: tombol, kartu, latar, ikon vektor, dan baris daftar. */
+/** Komponen tampilan kustom: tombol, kartu, dialog modern, ikon vektor, dan baris daftar. */
 final class Components {
     private Components() {
+    }
+
+    /** Membuat dialog modal kustom tanpa bingkai OS agar serasi dengan tema gelap & terang. */
+    static JDialog modalDialog(Window owner, String badge, String title, String subtitle,
+                                Color tone, JComponent content, JPanel footer, int width, int height) {
+        JDialog dialog = new JDialog(owner, title, Dialog.ModalityType.APPLICATION_MODAL);
+        dialog.setUndecorated(true);
+
+        DialogBody body = new DialogBody(new BorderLayout(0, 0), tone);
+
+        // Header kustom yang bisa di-drag
+        JPanel headerWrap = p(new BorderLayout(0, 12));
+        headerWrap.setBorder(BorderFactory.createEmptyBorder(20, 24, 0, 24));
+        headerWrap.setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
+
+        final Point[] dragOffset = {null};
+        headerWrap.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                dragOffset[0] = e.getPoint();
+            }
+        });
+        headerWrap.addMouseMotionListener(new MouseMotionAdapter() {
+            @Override
+            public void mouseDragged(MouseEvent e) {
+                if (dragOffset[0] != null) {
+                    Point loc = dialog.getLocation();
+                    dialog.setLocation(loc.x + e.getX() - dragOffset[0].x, loc.y + e.getY() - dragOffset[0].y);
+                }
+            }
+        });
+
+        JPanel topRow = p(new BorderLayout(12, 0));
+
+        JLabel badgeLbl = new JLabel(badge) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                quality(g2);
+                g2.setColor(new Color(tone.getRed(), tone.getGreen(), tone.getBlue(), 34));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
+                g2.setColor(new Color(tone.getRed(), tone.getGreen(), tone.getBlue(), 110));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, getHeight(), getHeight());
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        badgeLbl.setFont(fb(10));
+        badgeLbl.setForeground(tone);
+        badgeLbl.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
+
+        JPanel badgeHold = p(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        badgeHold.add(badgeLbl);
+
+        JButton closeBtn = new JButton("\u2715") {
+            private boolean hover;
+
+            {
+                setContentAreaFilled(false);
+                setBorderPainted(false);
+                setFocusPainted(false);
+                setOpaque(false);
+                setFont(fb(12));
+                setPreferredSize(new Dimension(32, 32));
+                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mouseEntered(MouseEvent e) {
+                        hover = true;
+                        repaint();
+                    }
+
+                    @Override
+                    public void mouseExited(MouseEvent e) {
+                        hover = false;
+                        repaint();
+                    }
+                });
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                quality(g2);
+                if (hover) {
+                    g2.setColor(new Color(239, 68, 68, 45));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                }
+                g2.setColor(hover ? new Color(248, 113, 113) : Theme.muted());
+                g2.setFont(getFont());
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString(getText(), (getWidth() - fm.stringWidth(getText())) / 2,
+                    (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
+                g2.dispose();
+            }
+        };
+        closeBtn.setToolTipText("Tutup (Esc)");
+        closeBtn.addActionListener(e -> dialog.dispose());
+
+        topRow.add(badgeHold, BorderLayout.WEST);
+        topRow.add(closeBtn, BorderLayout.EAST);
+
+        JPanel titleBox = p(new GridLayout(0, 1, 0, 4));
+        titleBox.add(label(title, fb(19), "title"));
+        if (subtitle != null && !subtitle.isEmpty()) {
+            titleBox.add(label(subtitle, f(12), tone == Theme.GOLD ? "gold" : "muted"));
+        }
+
+        JPanel headContent = p(new BorderLayout(0, 8));
+        headContent.add(topRow, BorderLayout.NORTH);
+        headContent.add(titleBox, BorderLayout.CENTER);
+
+        headerWrap.add(headContent, BorderLayout.CENTER);
+        headerWrap.add(new HLine(), BorderLayout.SOUTH);
+
+        // Konten utama
+        JPanel centerWrap = p(new BorderLayout());
+        centerWrap.setBorder(BorderFactory.createEmptyBorder(14, 24, 14, 24));
+        centerWrap.add(content, BorderLayout.CENTER);
+
+        // Footer tombol aksi
+        JPanel southWrap = p(new BorderLayout(0, 14));
+        southWrap.setBorder(BorderFactory.createEmptyBorder(0, 24, 20, 24));
+        southWrap.add(new HLine(), BorderLayout.NORTH);
+        southWrap.add(footer, BorderLayout.CENTER);
+
+        body.add(headerWrap, BorderLayout.NORTH);
+        body.add(centerWrap, BorderLayout.CENTER);
+        body.add(southWrap, BorderLayout.SOUTH);
+
+        dialog.getRootPane().registerKeyboardAction(
+            e -> dialog.dispose(),
+            KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+            JComponent.WHEN_IN_FOCUSED_WINDOW
+        );
+
+        dialog.setContentPane(body);
+        Theme.apply(body);
+        dialog.setSize(width, height);
+        dialog.setLocationRelativeTo(owner);
+        return dialog;
     }
 
     /** Ikon vektor murni Graphics2D agar tidak muncul kotak kosong (tofu) pada font. */
@@ -234,7 +373,7 @@ final class Components {
         @Override
         public Dimension getPreferredSize() {
             Dimension d = super.getPreferredSize();
-            return new Dimension(d.width + (compact ? 14 : 24), compact ? 32 : 42);
+            return new Dimension(d.width + (compact ? 16 : 24), compact ? 34 : 42);
         }
 
         @Override
@@ -250,10 +389,10 @@ final class Components {
                 fill = new Color(239, 68, 68, hover ? 70 : 38);
             }
             g2.setColor(fill);
-            g2.fillRoundRect(0, 0, w, h, 14, 14);
+            g2.fillRoundRect(0, 0, w, h, 12, 12);
             if (!primary) {
                 g2.setColor(danger ? new Color(239, 68, 68, 140) : Theme.border());
-                g2.drawRoundRect(0, 0, w - 1, h - 1, 14, 14);
+                g2.drawRoundRect(0, 0, w - 1, h - 1, 12, 12);
             }
             g2.setColor(primary ? Color.WHITE : (danger ? new Color(248, 113, 113) : Theme.text()));
             g2.setFont(getFont());
@@ -506,7 +645,6 @@ final class Components {
         Color background;
         BufferedImage photo;
         private final int size;
-        private final Color foreground;
         private BufferedImage cache;
         private BufferedImage cacheSource;
 
@@ -518,7 +656,6 @@ final class Components {
             this.initials = initials;
             this.size = size;
             this.background = background;
-            this.foreground = foreground;
             this.photo = photo;
         }
 
@@ -582,18 +719,17 @@ final class Components {
         }
     }
 
-    /** Pemilih foto profil tanpa lingkaran '?': tombol Pilih File saja, foto muncul setelah dipilih. */
+    /** Pemilih foto profil dengan siluet avatar rapi dan tombol Pilih File. */
     static class PhotoPicker extends JPanel {
         private BufferedImage photo;
-        private final AvatarIcon icon = new AvatarIcon("", 56, new Color(147, 197, 253), new Color(15, 23, 42));
+        private final AvatarIcon icon = new AvatarIcon("", 42, new Color(147, 197, 253), new Color(15, 23, 42));
         private final JLabel preview = new JLabel(icon);
         private final JLabel fileName = new JLabel("Belum ada file dipilih");
-        private final AppButton removeButton = new AppButton("Hapus Foto", false).compact();
+        private final AppButton removeButton = new AppButton("Hapus", false).compact();
 
         PhotoPicker() {
             super(new BorderLayout(12, 0));
             setOpaque(false);
-            preview.setVisible(false);
 
             AppButton choose = new AppButton("Pilih File", false).compact();
             choose.addActionListener(e -> {
@@ -605,6 +741,7 @@ final class Components {
             });
             fileName.setFont(f(12));
             fileName.putClientProperty("role", "muted");
+            removeButton.setDanger(true);
             removeButton.addActionListener(e -> setPhoto(null));
             removeButton.setVisible(false);
 
@@ -635,9 +772,8 @@ final class Components {
             this.photo = photo;
             icon.photo = photo;
             boolean hasPhoto = (photo != null);
-            preview.setVisible(hasPhoto);
             removeButton.setVisible(hasPhoto);
-            fileName.setText(hasPhoto ? "Foto profil dipilih" : "Belum ada file dipilih");
+            fileName.setText(hasPhoto ? "Foto profil terpilih" : "Belum ada file dipilih");
             preview.repaint();
             revalidate();
             repaint();
@@ -645,7 +781,6 @@ final class Components {
 
         void refresh() {
             icon.photo = photo;
-            preview.setVisible(photo != null);
             preview.repaint();
         }
     }

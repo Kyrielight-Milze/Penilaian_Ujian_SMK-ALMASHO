@@ -70,12 +70,10 @@ final class DashboardPage extends Page {
     private void refreshDashboard() {
         int gradeCount = 0;
         Set<String> subjects = new HashSet<>();
-        double total = 0;
         for (StudentRecord s : DataStore.STUDENTS) {
             gradeCount += s.grades.size();
             for (GradeRecord g : s.grades) {
                 subjects.add(g.subject.toLowerCase());
-                total += g.score;
             }
         }
 

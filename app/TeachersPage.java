@@ -1,5 +1,10 @@
 package app;
 
+import app.Components.*;
+import static app.Components.modalDialog; // <-- tambahkan baris ini
+import static app.Theme.f;
+import static app.Theme.fb;
+import static app.Ui.*;
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
@@ -13,7 +18,7 @@ import static app.Theme.f;
 import static app.Theme.fb;
 import static app.Ui.*;
 
-/** Operator: kelola akun guru dengan ikon vektor dan rekap data tercentang. */
+/** Operator: kelola akun guru dengan ikon vektor dan dialog modern. */
 final class TeachersPage extends Page {
     private final JCheckBox selectAllBox = new JCheckBox();
     private JButton rekapBtn;
@@ -237,18 +242,18 @@ final class TeachersPage extends Page {
     }
 
     private void showRekapDialog(List<TeacherRecord> list, String title) {
-        JDialog dialog = new JDialog(app.frame(), title, Dialog.ModalityType.APPLICATION_MODAL);
+        final JDialog[] dialogRef = new JDialog[1];
 
         int totalMapel = 0;
         for (TeacherRecord t : list) {
             totalMapel += t.subjects.size();
         }
 
-        JPanel summaryBar = p(new FlowLayout(FlowLayout.LEFT, 14, 6));
-        summaryBar.add(label("Total Guru Terpilih: " + list.size() + " guru", fb(13), "title"));
-        summaryBar.add(label("• Total Mata Pelajaran Diampu: " + totalMapel + " mapel", f(12), "muted"));
+        JPanel summaryBar = p(new FlowLayout(FlowLayout.LEFT, 12, 4));
+        summaryBar.add(label("Total Guru: " + list.size() + " guru", fb(13), "title"));
+        summaryBar.add(label("\u00B7  Total Mata Pelajaran Diampu: " + totalMapel + " mapel", f(12), "muted"));
 
-        String[] cols = {"No", "Nama Guru", "Username (Gmail)", "Mata Pelajaran", "Jumlah Mapel"};
+        String[] cols = {"No", "Nama Guru", "Username (Gmail)", "Mata Pelajaran", "Jumlah"};
         Object[][] data = new Object[list.size()][cols.length];
         for (int i = 0; i < list.size(); i++) {
             TeacherRecord t = list.get(i);
@@ -265,13 +270,38 @@ final class TeachersPage extends Page {
                 return false;
             }
         });
-        rekapTable.setRowHeight(32);
+        rekapTable.setRowHeight(34);
         rekapTable.setFont(f(12));
+        rekapTable.setShowVerticalLines(false);
+        rekapTable.setFillsViewportHeight(true);
         rekapTable.getTableHeader().setFont(fb(12));
+        rekapTable.getTableHeader().setPreferredSize(new Dimension(0, 34));
         rekapTable.getColumnModel().getColumn(0).setMaxWidth(45);
-        rekapTable.getColumnModel().getColumn(4).setMaxWidth(100);
+        rekapTable.getColumnModel().getColumn(4).setMaxWidth(95);
+
+        DefaultTableCellRenderer rekapRenderer = new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable tbl, Object val, boolean sel,
+                                                           boolean foc, int row, int col) {
+                super.getTableCellRendererComponent(tbl, val, sel, foc, row, col);
+                setBackground(sel ? Theme.accentSoft() : Theme.surface());
+                setForeground(sel ? Theme.accentText() : Theme.text());
+                setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
+                setHorizontalAlignment(col == 0 || col == 4 ? SwingConstants.CENTER : SwingConstants.LEFT);
+                return this;
+            }
+        };
+        for (int c = 0; c < rekapTable.getColumnCount(); c++) {
+            rekapTable.getColumnModel().getColumn(c).setCellRenderer(rekapRenderer);
+        }
 
         JScrollPane scroll = new JScrollPane(rekapTable);
+        scroll.setBorder(BorderFactory.createLineBorder(Theme.border()));
+        scroll.getViewport().setBackground(Theme.surface());
+
+        JPanel content = p(new BorderLayout(0, 10));
+        content.add(summaryBar, BorderLayout.NORTH);
+        content.add(scroll, BorderLayout.CENTER);
 
         AppButton copyBtn = new AppButton("Salin Rekap", false);
         copyBtn.addActionListener(e -> {
@@ -285,27 +315,28 @@ final class TeachersPage extends Page {
                   .append(t.subjectsText()).append("\n");
             }
             Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(sb.toString()), null);
-            AppDialog.show(dialog, AppDialog.SUCCESS, "Tersalin", "Rekap data guru terpilih berhasil disalin ke clipboard.");
+            AppDialog.show(dialogRef[0], AppDialog.SUCCESS, "Tersalin", "Rekap data guru terpilih berhasil disalin ke clipboard.");
         });
 
         AppButton closeBtn = new AppButton("Tutup", true);
-        closeBtn.addActionListener(e -> dialog.dispose());
+        closeBtn.addActionListener(e -> dialogRef[0].dispose());
 
-        JPanel footer = p(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        JPanel footer = p(new GridLayout(1, 2, 12, 0));
         footer.add(copyBtn);
         footer.add(closeBtn);
 
-        JPanel body = p(new BorderLayout(0, 12));
-        body.setBorder(BorderFactory.createEmptyBorder(18, 20, 18, 20));
-        body.add(summaryBar, BorderLayout.NORTH);
-        body.add(scroll, BorderLayout.CENTER);
-        body.add(footer, BorderLayout.SOUTH);
-
-        dialog.setContentPane(body);
-        Theme.apply(body);
-        dialog.setSize(720, 420);
-        dialog.setLocationRelativeTo(app.frame());
-        dialog.setVisible(true);
+        dialogRef[0] = modalDialog(
+            app.frame(),
+            "REKAPITULASI DATA GURU",
+            title,
+            "Ringkasan akun dan distribusi mata pelajaran yang diampu",
+            new Color(16, 185, 129),
+            content,
+            footer,
+            740,
+            460
+        );
+        dialogRef[0].setVisible(true);
     }
 
     private void configureTable() {
@@ -448,9 +479,7 @@ final class TeachersPage extends Page {
 
     private void openTeacherFormDialog(TeacherRecord editing) {
         boolean isEdit = (editing != null);
-        JDialog dialog = new JDialog(app.frame(),
-            isEdit ? "Ubah Akun Guru" : "Tambah Akun Guru",
-            Dialog.ModalityType.APPLICATION_MODAL);
+        final JDialog[] dialogRef = new JDialog[1];
 
         PhotoPicker picker = new PhotoPicker();
         JTextField nameField = new JTextField(isEdit ? editing.name : "");
@@ -462,7 +491,7 @@ final class TeachersPage extends Page {
         if (isEdit) {
             picker.setPhoto(editing.photo);
             userField.setEditable(false);
-            userField.setForeground(Theme.muted());
+            userField.setToolTipText("Username tidak dapat diubah");
             subjectPicker.setSubjects(editing.subjects);
         }
 
@@ -479,16 +508,21 @@ final class TeachersPage extends Page {
         c.weightx = 1;
         c.anchor = GridBagConstraints.WEST;
         c.fill = GridBagConstraints.HORIZONTAL;
-        c.insets = new Insets(10, 0, 2, 0);
-        form.add(label("Mata pelajaran", f(13), "muted"), c);
+        c.insets = new Insets(12, 0, 4, 0);
+        form.add(label("Mata pelajaran yang diampu", fb(12.5f), "title"), c);
         c.gridy = 5;
-        c.insets = new Insets(2, 0, 5, 0);
+        c.insets = new Insets(2, 0, 4, 0);
         form.add(subjectPicker, c);
 
-        AppButton saveBtn = new AppButton(isEdit ? "Simpan Perubahan" : "Tambah Akun Guru", true);
-        AppButton cancelBtn = new AppButton("Batal", false);
-        cancelBtn.addActionListener(e -> dialog.dispose());
+        JScrollPane scroll = formScroll(form);
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
 
+        AppButton cancelBtn = new AppButton("Batal", false);
+        cancelBtn.addActionListener(e -> dialogRef[0].dispose());
+
+        AppButton saveBtn = new AppButton(isEdit ? "Simpan Perubahan" : "Tambah Akun Guru", true);
         saveBtn.addActionListener(e -> {
             String nama = nameField.getText().trim();
             String user = userField.getText().trim();
@@ -508,7 +542,7 @@ final class TeachersPage extends Page {
                 editing.subjects.addAll(subjects);
                 editing.photo = picker.getPhoto();
                 DataStore.updateTeacher(editing);
-                dialog.dispose();
+                dialogRef[0].dispose();
                 onShow();
                 success("Perubahan data guru berhasil disimpan.");
             } else {
@@ -528,33 +562,28 @@ final class TeachersPage extends Page {
                 teacher.subjects.addAll(subjects);
                 teacher.photo = picker.getPhoto();
                 DataStore.addTeacher(teacher);
-                dialog.dispose();
+                dialogRef[0].dispose();
                 onShow();
                 success("Akun guru berhasil ditambahkan.");
             }
         });
 
-        JPanel btnRow = p(new GridLayout(1, 2, 10, 0));
+        JPanel btnRow = p(new GridLayout(1, 2, 12, 0));
         btnRow.add(cancelBtn);
         btnRow.add(saveBtn);
 
-        JPanel head = p(new GridLayout(0, 1, 0, 2));
-        head.add(label(isEdit ? "Ubah data guru" : "Tambah akun guru", fb(16), "title"));
-        if (isEdit) {
-            head.add(label(EDIT_HINT, f(12), "gold"));
-        }
-
-        JPanel body = p(new BorderLayout(0, 14));
-        body.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
-        body.add(head, BorderLayout.NORTH);
-        body.add(formScroll(form), BorderLayout.CENTER);
-        body.add(btnRow, BorderLayout.SOUTH);
-
-        dialog.setContentPane(body);
-        Theme.apply(body);
-        dialog.setSize(520, 520);
-        dialog.setLocationRelativeTo(app.frame());
-        dialog.setVisible(true);
+        dialogRef[0] = modalDialog(
+            app.frame(),
+            isEdit ? "EDIT AKUN GURU" : "AKUN GURU BARU",
+            isEdit ? "Ubah Data Guru" : "Tambah Akun Guru",
+            isEdit ? EDIT_HINT : "Lengkapi biodata, akses login Gmail, dan mata pelajaran guru",
+            isEdit ? Theme.GOLD : Theme.ACCENT,
+            scroll,
+            btnRow,
+            540,
+            585
+        );
+        dialogRef[0].setVisible(true);
     }
 
     private void applyFilterAndRender() {
