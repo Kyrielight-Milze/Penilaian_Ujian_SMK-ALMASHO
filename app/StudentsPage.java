@@ -3,6 +3,7 @@ package app;
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,9 +13,10 @@ import static app.Theme.f;
 import static app.Theme.fb;
 import static app.Ui.*;
 
-/** Operator: tampilan tabel ala Web TKA dengan simbol tambah, edit, hapus, dan filter. */
+/** Operator: tampilan tabel ala Web TKA dengan simbol vektor dan rekap data tercentang. */
 final class StudentsPage extends Page {
     private final JCheckBox selectAllBox = new JCheckBox();
+    private JButton rekapBtn;
     private final JComboBox<String> classFilter = new JComboBox<>(new String[]{"Semua Kelas", "10", "11", "12"});
     private final JTextField searchInput = new JTextField(16);
     private final JComboBox<Integer> pageSizeBox = new JComboBox<>(new Integer[]{10, 20, 50, 100});
@@ -35,6 +37,7 @@ final class StudentsPage extends Page {
     void onShow() {
         selectAllBox.setSelected(false);
         applyFilterAndRender();
+        updateRekapButtonLabel();
     }
 
     @Override
@@ -48,16 +51,19 @@ final class StudentsPage extends Page {
     JPanel view() {
         RoundPanel mainCard = card(new BorderLayout(0, 0), 14, 0, false);
 
-        // 1. Header Judul Card ala Web TKA
+        // 1. Header Judul Card dengan ikon tabel
         JPanel cardHeader = p(new BorderLayout());
         cardHeader.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
             BorderFactory.createEmptyBorder(12, 18, 12, 18)
         ));
-        cardHeader.add(label("\u25A4  Data Peserta / Siswa", fb(14), "title"), BorderLayout.WEST);
+        JLabel titleLbl = label("Data Peserta / Siswa", fb(14), "title");
+        titleLbl.setIcon(new VectorIcon("table", 15, Theme.text()));
+        titleLbl.setIconTextGap(8);
+        cardHeader.add(titleLbl, BorderLayout.WEST);
         mainCard.add(cardHeader, BorderLayout.NORTH);
 
-        // 2. Toolbar Atas (Checkbox | Rekap | + | Edit | Hapus || Filter | Cari) + Tabel
+        // 2. Toolbar Atas (Checkbox | Rekap | + | Pensil | Sampah || Filter | Cari)
         JPanel centerArea = p(new BorderLayout());
 
         JPanel toolbar = p(new BorderLayout(10, 6));
@@ -66,22 +72,22 @@ final class StudentsPage extends Page {
         JPanel leftTools = p(new FlowLayout(FlowLayout.LEFT, 8, 0));
         selectAllBox.setOpaque(false);
         selectAllBox.setToolTipText("Pilih Semua");
-        selectAllBox.addActionListener(e -> tableModel.setAllChecked(selectAllBox.isSelected()));
+        selectAllBox.addActionListener(e -> {
+            tableModel.setAllChecked(selectAllBox.isSelected());
+            updateRekapButtonLabel();
+        });
 
-        JButton rekapBtn = makeSymbolBtn("\u25A4 Rekap \u25BE", "Rekap Jumlah Siswa", false, null);
-        rekapBtn.setPreferredSize(new Dimension(92, 32));
-        rekapBtn.addActionListener(e -> showRekapPopup(rekapBtn));
+        rekapBtn = makeIconTextBtn("Rekap", new VectorIcon("table", 14, Theme.text()), "Rekap Data Terpilih");
+        rekapBtn.setPreferredSize(new Dimension(115, 32));
+        rekapBtn.addActionListener(e -> handleRekapAction());
 
-        JButton addBtn = makeSymbolBtn("+", "Tambah Data Siswa", true, new Color(22, 163, 74));
-        addBtn.setFont(fb(16));
+        JButton addBtn = makeSymbolBtn(new VectorIcon("plus", 15, Color.WHITE), "Tambah Data Siswa", new Color(22, 163, 74));
         addBtn.addActionListener(e -> openStudentFormDialog(null));
 
-        JButton editBtn = makeSymbolBtn("\u270E", "Edit Data Siswa Terpilih", true, new Color(234, 179, 8));
-        editBtn.setFont(fb(15));
+        JButton editBtn = makeSymbolBtn(new VectorIcon("pencil", 15, Color.WHITE), "Edit Data Siswa Terpilih", new Color(234, 179, 8));
         editBtn.addActionListener(e -> handleEditSelected());
 
-        JButton deleteBtn = makeSymbolBtn("\uD83D\uDDD1", "Hapus Data Siswa Terpilih", true, new Color(220, 38, 38));
-        deleteBtn.setFont(f(14));
+        JButton deleteBtn = makeSymbolBtn(new VectorIcon("trash", 15, Color.WHITE), "Hapus Data Siswa Terpilih", new Color(220, 38, 38));
         deleteBtn.addActionListener(e -> handleDeleteSelected());
 
         leftTools.add(selectAllBox);
@@ -108,7 +114,7 @@ final class StudentsPage extends Page {
             }
         });
 
-        JButton searchBtn = makeSymbolBtn("\uD83D\uDD0D Cari", "Cari Siswa", false, null);
+        JButton searchBtn = makeIconTextBtn("Cari", new VectorIcon("search", 13, Theme.text()), "Cari Siswa");
         searchBtn.setPreferredSize(new Dimension(78, 32));
         searchBtn.addActionListener(e -> {
             currentPage = 1;
@@ -124,6 +130,8 @@ final class StudentsPage extends Page {
         centerArea.add(toolbar, BorderLayout.NORTH);
 
         configureTable();
+        tableModel.addTableModelListener(e -> updateRekapButtonLabel());
+
         JScrollPane tableScroll = new JScrollPane(table);
         tableScroll.setBorder(BorderFactory.createMatteBorder(1, 0, 1, 0, Theme.border()));
         tableScroll.getViewport().setBackground(Theme.surface());
@@ -136,11 +144,12 @@ final class StudentsPage extends Page {
         footerBar.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
 
         JPanel leftPage = p(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        JButton firstBtn = makePageBtn("|<");
-        JButton prevBtn = makePageBtn("<");
-        JButton nextBtn = makePageBtn(">");
-        JButton lastBtn = makePageBtn(">|");
-        JButton reloadBtn = makePageBtn("\u21BB");
+        JButton firstBtn = makePageBtn("|<", null);
+        JButton prevBtn = makePageBtn("<", null);
+        JButton nextBtn = makePageBtn(">", null);
+        JButton lastBtn = makePageBtn(">|", null);
+        JButton reloadBtn = makePageBtn("", new VectorIcon("refresh", 13, Theme.text()));
+        reloadBtn.setToolTipText("Muat ulang data");
 
         pageInput.setHorizontalAlignment(SwingConstants.CENTER);
         pageInput.setFont(f(12));
@@ -206,6 +215,119 @@ final class StudentsPage extends Page {
         return pageShell("Data Siswa", "Biodata siswa beserta akun login (kelas 10, 11, atau 12)", mainCard);
     }
 
+    private void updateRekapButtonLabel() {
+        if (rekapBtn == null) {
+            return;
+        }
+        int checkedCount = tableModel.getCheckedRecords().size();
+        int rowCount = tableModel.getRowCount();
+        selectAllBox.setSelected(rowCount > 0 && checkedCount == rowCount);
+        if (checkedCount > 0) {
+            rekapBtn.setText("Rekap (" + checkedCount + ")");
+            rekapBtn.setBackground(Theme.accentSoft());
+            rekapBtn.setForeground(Theme.accentText());
+        } else {
+            rekapBtn.setText("Rekap");
+            rekapBtn.setBackground(Theme.input());
+            rekapBtn.setForeground(Theme.text());
+        }
+    }
+
+    private void handleRekapAction() {
+        List<StudentRecord> checked = tableModel.getCheckedRecords();
+        if (!checked.isEmpty()) {
+            showRekapDialog(checked, "Rekap Data Siswa Terpilih (" + checked.size() + " Siswa)");
+        } else {
+            JPopupMenu menu = new JPopupMenu();
+            menu.setBackground(Theme.surface());
+            long k10 = DataStore.STUDENTS.stream().filter(s -> "10".equals(s.studentClass)).count();
+            long k11 = DataStore.STUDENTS.stream().filter(s -> "11".equals(s.studentClass)).count();
+            long k12 = DataStore.STUDENTS.stream().filter(s -> "12".equals(s.studentClass)).count();
+            menu.add(new JMenuItem("Total Semua Siswa: " + DataStore.STUDENTS.size()));
+            menu.add(new JMenuItem("Kelas 10: " + k10 + " | Kelas 11: " + k11 + " | Kelas 12: " + k12));
+            menu.addSeparator();
+            JMenuItem allItem = new JMenuItem("Buka Tabel Rekap Semua Siswa...");
+            allItem.addActionListener(ev -> showRekapDialog(filteredList, "Rekap Semua Data Siswa (" + filteredList.size() + " Siswa)"));
+            menu.add(allItem);
+            menu.show(rekapBtn, 0, rekapBtn.getHeight() + 4);
+        }
+    }
+
+    private void showRekapDialog(List<StudentRecord> list, String title) {
+        JDialog dialog = new JDialog(app.frame(), title, Dialog.ModalityType.APPLICATION_MODAL);
+
+        long k10 = list.stream().filter(s -> "10".equals(s.studentClass)).count();
+        long k11 = list.stream().filter(s -> "11".equals(s.studentClass)).count();
+        long k12 = list.stream().filter(s -> "12".equals(s.studentClass)).count();
+
+        JPanel summaryBar = p(new FlowLayout(FlowLayout.LEFT, 14, 6));
+        summaryBar.add(label("Total Terpilih: " + list.size() + " siswa", fb(13), "title"));
+        summaryBar.add(label("• Kelas 10: " + k10, f(12), "muted"));
+        summaryBar.add(label("• Kelas 11: " + k11, f(12), "muted"));
+        summaryBar.add(label("• Kelas 12: " + k12, f(12), "muted"));
+
+        String[] cols = {"No", "Nama Lengkap", "Kelas", "Username", "Email", "No. Telepon", "Alamat"};
+        Object[][] data = new Object[list.size()][cols.length];
+        for (int i = 0; i < list.size(); i++) {
+            StudentRecord s = list.get(i);
+            data[i][0] = i + 1;
+            data[i][1] = s.name;
+            data[i][2] = "Kelas " + s.studentClass;
+            data[i][3] = s.username;
+            data[i][4] = s.email;
+            data[i][5] = s.phone;
+            data[i][6] = s.address;
+        }
+
+        JTable rekapTable = new JTable(new DefaultTableModel(data, cols) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        });
+        rekapTable.setRowHeight(32);
+        rekapTable.setFont(f(12));
+        rekapTable.getTableHeader().setFont(fb(12));
+        rekapTable.getColumnModel().getColumn(0).setMaxWidth(45);
+        rekapTable.getColumnModel().getColumn(2).setMaxWidth(85);
+
+        JScrollPane scroll = new JScrollPane(rekapTable);
+
+        AppButton copyBtn = new AppButton("Salin Rekap", false);
+        copyBtn.addActionListener(e -> {
+            StringBuilder sb = new StringBuilder();
+            sb.append(title).append("\n");
+            sb.append("Kelas 10: ").append(k10).append(" | Kelas 11: ").append(k11).append(" | Kelas 12: ").append(k12).append("\n\n");
+            for (int i = 0; i < list.size(); i++) {
+                StudentRecord s = list.get(i);
+                sb.append(i + 1).append(". ").append(s.name)
+                  .append(" (Kelas ").append(s.studentClass).append(") - ")
+                  .append(s.username).append(" | ").append(s.phone).append("\n");
+            }
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(sb.toString()), null);
+            AppDialog.show(dialog, AppDialog.SUCCESS, "Tersalin", "Rekap data terpilih berhasil disalin ke clipboard.");
+        });
+
+        AppButton closeBtn = new AppButton("Tutup", true);
+        closeBtn.addActionListener(e -> dialog.dispose());
+
+        JPanel footer = p(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        footer.add(copyBtn);
+        footer.add(closeBtn);
+
+        JPanel body = p(new BorderLayout(0, 12));
+        body.setBorder(BorderFactory.createEmptyBorder(18, 20, 18, 20));
+        body.add(summaryBar, BorderLayout.NORTH);
+        body.add(scroll, BorderLayout.CENTER);
+        body.add(footer, BorderLayout.SOUTH);
+
+        dialog.setContentPane(body);
+        Theme.apply(body);
+        dialog.setSize(760, 440);
+        dialog.setLocationRelativeTo(app.frame());
+        dialog.setVisible(true);
+    }
+
     private void configureTable() {
         table.setRowHeight(44);
         table.setFont(f(12.5f));
@@ -219,17 +341,16 @@ final class StudentsPage extends Page {
         header.setReorderingAllowed(false);
 
         TableColumnModel cm = table.getColumnModel();
-        cm.getColumn(0).setMaxWidth(45);      // Cek
-        cm.getColumn(1).setMaxWidth(48);      // No
-        cm.getColumn(2).setMaxWidth(58);      // Foto
-        cm.getColumn(3).setPreferredWidth(180); // Nama Lengkap
-        cm.getColumn(4).setMaxWidth(85);      // Kelas
-        cm.getColumn(5).setPreferredWidth(160); // Alamat
-        cm.getColumn(6).setPreferredWidth(165); // Email
-        cm.getColumn(7).setPreferredWidth(165); // Username
-        cm.getColumn(8).setPreferredWidth(115); // Telepon
+        cm.getColumn(0).setMaxWidth(45);
+        cm.getColumn(1).setMaxWidth(48);
+        cm.getColumn(2).setMaxWidth(58);
+        cm.getColumn(3).setPreferredWidth(180);
+        cm.getColumn(4).setMaxWidth(85);
+        cm.getColumn(5).setPreferredWidth(160);
+        cm.getColumn(6).setPreferredWidth(165);
+        cm.getColumn(7).setPreferredWidth(165);
+        cm.getColumn(8).setPreferredWidth(115);
 
-        // Renderer Kolom Foto: JIKA PP KOSONG JANGAN GAMBAR HURUF DEPAN (TA/IM)
         cm.getColumn(2).setCellRenderer((tbl, value, isSelected, hasFocus, row, col) -> {
             JPanel cell = new JPanel(new GridBagLayout());
             cell.setBackground(isSelected ? Theme.accentSoft() : Theme.surface());
@@ -245,7 +366,6 @@ final class StudentsPage extends Page {
             return cell;
         });
 
-        // Renderer teks kolom lain mengikuti tema terang/gelap
         DefaultTableCellRenderer textRenderer = new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable tbl, Object value, boolean isSelected,
@@ -268,7 +388,6 @@ final class StudentsPage extends Page {
             }
         }
 
-        // Klik ganda pada baris membuka detail lengkap siswa
         table.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -282,46 +401,37 @@ final class StudentsPage extends Page {
         });
     }
 
-    private JButton makeSymbolBtn(String text, String tooltip, boolean colored, Color bg) {
-        JButton btn = new JButton(text);
+    private JButton makeSymbolBtn(Icon icon, String tooltip, Color bg) {
+        JButton btn = new JButton(icon);
         btn.setToolTipText(tooltip);
         btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setPreferredSize(new Dimension(34, 32));
-        if (colored && bg != null) {
-            btn.setBackground(bg);
-            btn.setForeground(Color.WHITE);
-            btn.setBorder(BorderFactory.createLineBorder(bg));
-        } else {
-            btn.setBackground(Theme.input());
-            btn.setForeground(Theme.text());
-            btn.setFont(fb(12));
-            btn.setBorder(BorderFactory.createLineBorder(Theme.border()));
-        }
+        btn.setPreferredSize(new Dimension(36, 32));
+        btn.setBackground(bg);
+        btn.setBorder(BorderFactory.createLineBorder(bg));
         return btn;
     }
 
-    private JButton makePageBtn(String text) {
-        JButton btn = new JButton(text);
+    private JButton makeIconTextBtn(String text, Icon icon, String tooltip) {
+        JButton btn = new JButton(text, icon);
+        btn.setToolTipText(tooltip);
+        btn.setFocusPainted(false);
+        btn.setIconTextGap(6);
+        btn.setFont(fb(12));
+        btn.setBackground(Theme.input());
+        btn.setForeground(Theme.text());
+        btn.setBorder(BorderFactory.createLineBorder(Theme.border()));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return btn;
+    }
+
+    private JButton makePageBtn(String text, Icon icon) {
+        JButton btn = icon != null ? new JButton(icon) : new JButton(text);
         btn.setFont(f(11));
         btn.setFocusPainted(false);
         btn.setMargin(new Insets(3, 8, 3, 8));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return btn;
-    }
-
-    private void showRekapPopup(Component invoker) {
-        JPopupMenu menu = new JPopupMenu();
-        menu.setBackground(Theme.surface());
-        long k10 = DataStore.STUDENTS.stream().filter(s -> "10".equals(s.studentClass)).count();
-        long k11 = DataStore.STUDENTS.stream().filter(s -> "11".equals(s.studentClass)).count();
-        long k12 = DataStore.STUDENTS.stream().filter(s -> "12".equals(s.studentClass)).count();
-        menu.add(new JMenuItem("Total Semua Siswa: " + DataStore.STUDENTS.size()));
-        menu.addSeparator();
-        menu.add(new JMenuItem("Kelas 10: " + k10 + " siswa"));
-        menu.add(new JMenuItem("Kelas 11: " + k11 + " siswa"));
-        menu.add(new JMenuItem("Kelas 12: " + k12 + " siswa"));
-        menu.show(invoker, 0, invoker.getHeight() + 4);
     }
 
     private void handleEditSelected() {
@@ -364,7 +474,6 @@ final class StudentsPage extends Page {
         onShow();
     }
 
-    // ===================== MODAL DIALOG TAMBAH / EDIT SISWA =====================
     private void openStudentFormDialog(StudentRecord editing) {
         boolean isEdit = (editing != null);
         JDialog dialog = new JDialog(app.frame(),
@@ -517,6 +626,7 @@ final class StudentsPage extends Page {
 
         List<StudentRecord> slice = (total == 0) ? new ArrayList<>() : filteredList.subList(start, end);
         tableModel.setData(slice, start + 1);
+        updateRekapButtonLabel();
 
         pageInput.setText(String.valueOf(currentPage));
         totalPageLabel.setText("dari " + totalPages);
@@ -545,7 +655,6 @@ final class StudentsPage extends Page {
         }
     }
 
-    // ===================== TABLE MODEL SISWA =====================
     private static final class StudentTableModel extends AbstractTableModel {
         private final String[] cols = {
             "Cek", "No", "Foto", "Nama Lengkap", "Kelas", "Alamat", "Email", "Username", "No. Telepon"
