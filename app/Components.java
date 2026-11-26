@@ -16,9 +16,87 @@ import static app.Theme.fb;
 import static app.Theme.quality;
 import static app.Ui.*;
 
-/** Komponen tampilan kustom: tombol, kartu, latar, ikon, dan baris daftar. */
+/** Komponen tampilan kustom: tombol, kartu, latar, ikon vektor, dan baris daftar. */
 final class Components {
     private Components() {
+    }
+
+    /** Ikon vektor murni Graphics2D agar tidak muncul kotak kosong (tofu) pada font. */
+    static class VectorIcon implements Icon {
+        private final String type;
+        private final int size;
+        private final Color color;
+
+        VectorIcon(String type, int size, Color color) {
+            this.type = type;
+            this.size = size;
+            this.color = color;
+        }
+
+        @Override
+        public int getIconWidth() {
+            return size;
+        }
+
+        @Override
+        public int getIconHeight() {
+            return size;
+        }
+
+        @Override
+        public void paintIcon(Component c, Graphics g, int x, int y) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            quality(g2);
+            g2.setColor(color != null ? color : Theme.text());
+            g2.setStroke(new BasicStroke(1.7f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            int s = size;
+
+            switch (type) {
+                case "table": {
+                    g2.drawRoundRect(x + 1, y + 2, s - 2, s - 4, 3, 3);
+                    g2.drawLine(x + 1, y + 6, x + s - 1, y + 6);
+                    g2.drawLine(x + 1, y + 10, x + s - 1, y + 10);
+                    g2.drawLine(x + s / 2, y + 6, x + s / 2, y + s - 2);
+                    break;
+                }
+                case "plus": {
+                    g2.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    int m = s / 2;
+                    g2.drawLine(x + m, y + 2, x + m, y + s - 2);
+                    g2.drawLine(x + 2, y + m, x + s - 2, y + m);
+                    break;
+                }
+                case "pencil": {
+                    int[] px = {x + s - 5, x + s - 2, x + 6, x + 2, x + 3};
+                    int[] py = {y + 2, y + 5, y + s - 3, y + s - 2, y + s - 6};
+                    g2.drawPolygon(px, py, 5);
+                    g2.drawLine(x + s - 7, y + 4, x + s - 4, y + 7);
+                    break;
+                }
+                case "trash": {
+                    g2.drawLine(x + 2, y + 4, x + s - 2, y + 4);
+                    g2.drawRect(x + s / 2 - 2, y + 2, 4, 2);
+                    g2.drawRect(x + 4, y + 4, s - 8, s - 6);
+                    g2.drawLine(x + s / 2 - 2, y + 7, x + s / 2 - 2, y + s - 4);
+                    g2.drawLine(x + s / 2 + 2, y + 7, x + s / 2 + 2, y + s - 4);
+                    break;
+                }
+                case "search": {
+                    g2.drawOval(x + 2, y + 2, s - 6, s - 6);
+                    g2.drawLine(x + s - 5, y + s - 5, x + s - 2, y + s - 2);
+                    break;
+                }
+                case "refresh": {
+                    g2.drawArc(x + 2, y + 2, s - 4, s - 4, 35, 290);
+                    g2.drawLine(x + s - 3, y + 2, x + s - 3, y + 6);
+                    g2.drawLine(x + s - 7, y + 6, x + s - 3, y + 6);
+                    break;
+                }
+                default:
+                    break;
+            }
+            g2.dispose();
+        }
     }
 
     /** Latar dengan cahaya biru lembut di pojok kiri atas. */
@@ -123,7 +201,6 @@ final class Components {
             repaint();
         }
 
-        /** Tombol lebih kecil untuk ruang sempit (mis. di dalam formulir). */
         AppButton compact() {
             compact = true;
             setFont(fb(12));
@@ -423,7 +500,7 @@ final class Components {
         }
     }
 
-    /** Avatar bulat: tampilkan foto jika ada; jika kosong tampilkan ikon siluet tanpa huruf depan (TA/IM). */
+    /** Avatar bulat: tampilkan foto jika ada; jika kosong tampilkan ikon siluet tanpa huruf depan. */
     static class AvatarIcon implements Icon {
         String initials;
         Color background;
@@ -484,7 +561,6 @@ final class Components {
                 g2.dispose();
                 return;
             }
-            // Tanpa huruf depan (TA, IM, dll) -> tampilkan ikon siluet profil netral
             g2.setClip(clip);
             g2.setColor(Theme.input());
             g2.fill(clip);
@@ -549,7 +625,6 @@ final class Components {
         }
 
         void bindName(javax.swing.text.JTextComponent field) {
-            // Tidak menampilkan inisial huruf saat foto kosong
         }
 
         BufferedImage getPhoto() {
@@ -575,7 +650,6 @@ final class Components {
         }
     }
 
-    /** Ikon di samping ucapan: matahari pada siang hari, bulan dan bintang pada malam hari. */
     static class TimeIcon extends JComponent {
         TimeIcon() {
             setPreferredSize(new Dimension(42, 42));
@@ -646,7 +720,6 @@ final class Components {
         }
     }
 
-    /** Isi dialog bertema: gradasi, garis aksen di atas, dan bingkai. */
     static class DialogBody extends JPanel {
         private final Color tone;
 
@@ -685,7 +758,6 @@ final class Components {
         }
     }
 
-    /** Baris daftar: hanya tampilkan avatar jika ada foto, tanpa huruf depan jika kosong. */
     static class PersonCell extends JPanel implements ListCellRenderer<String> {
         private final boolean teacher;
         private final JLabel avatar = new JLabel();
