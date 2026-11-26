@@ -16,7 +16,7 @@ import static app.Theme.fb;
 import static app.Theme.quality;
 import static app.Ui.*;
 
-/** Jendela utama: sidebar ala Web TKA, top bar, navigasi, dan perpindahan halaman. */
+/** Jendela utama: sidebar minimized saat awal dibuka, top bar, navigasi, dan perpindahan halaman. */
 final class AppShell {
     private JFrame frame;
     private final CardLayout rootCards = new CardLayout();
@@ -27,11 +27,15 @@ final class AppShell {
     private LoginScreen login;
 
     private EdgePanel sidebar;
-    private JPanel brandBox;
+    private JLabel logoLabel;
+    private JLabel appTitleLabel;
+    private JLabel schoolSubLabel;
     private JPanel quickBar;
+    private final List<TkaQuickButton> quickButtons = new ArrayList<>();
     private JPanel navList;
     private IconButton collapseButton;
-    private boolean collapsed = false;
+    // Sidebar otomatis dalam mode minimize saat aplikasi pertama kali dibuka
+    private boolean collapsed = true;
     private final List<NavButton> navButtons = new ArrayList<>();
 
     private static final class NavEntry {
@@ -130,7 +134,11 @@ final class AppShell {
         activeRole = role;
         refreshUser();
 
+        // Pastikan sidebar dimulai dalam keadaan minimize setiap kali masuk
+        collapsed = true;
+        applySidebarState();
         buildNav(role);
+
         frame.getRootPane().setDefaultButton(null);
         rootCards.show(root, "app");
         showPage("dashboard");
@@ -167,9 +175,7 @@ final class AppShell {
                 c.active = c.key.equals(key);
                 childOn |= c.active;
             }
-            if (childOn) {
-                entry.button.expanded = true;
-            }
+            entry.button.expanded = true;
             entry.button.childActive = childOn;
         }
         rebuildNavList();
@@ -197,34 +203,35 @@ final class AppShell {
     // ===================== SIDEBAR ALA WEB TKA =====================
     private EdgePanel buildSidebar() {
         EdgePanel sb = new EdgePanel(new BorderLayout(0, 0), true, true);
-        sb.setPreferredSize(new Dimension(255, 0));
+        sb.setPreferredSize(new Dimension(collapsed ? 78 : 255, 0));
 
-        // 1. Header Logo Tengah atas + Bar Gelap (Dasbor | Pengaturan | Keluar)
         JPanel topTkaHeader = p(new BorderLayout(0, 0));
 
-        brandBox = new JPanel();
+        JPanel brandBox = new JPanel();
         brandBox.setOpaque(false);
         brandBox.setLayout(new BoxLayout(brandBox, BoxLayout.Y_AXIS));
-        brandBox.setBorder(BorderFactory.createEmptyBorder(16, 12, 12, 12));
+        brandBox.setBorder(BorderFactory.createEmptyBorder(14, 8, 12, 8));
 
-        JLabel logo = new JLabel(logoIcon(62));
-        logo.setAlignmentX(Component.CENTER_ALIGNMENT);
+        logoLabel = new JLabel(logoIcon(collapsed ? 38 : 62));
+        logoLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel appTitle = label("APLIKASI PENDATAAN SISWA", fb(11), "title");
-        appTitle.setForeground(new Color(41, 128, 185));
-        appTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
+        appTitleLabel = label("APLIKASI PENDATAAN SISWA", fb(11), "title");
+        appTitleLabel.setForeground(new Color(41, 128, 185));
+        appTitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        appTitleLabel.setVisible(!collapsed);
 
-        JLabel schoolSub = label("SMK AL MALIKUS SHOLEH", f(10), "muted");
-        schoolSub.setAlignmentX(Component.CENTER_ALIGNMENT);
+        schoolSubLabel = label("SMK AL MALIKUS SHOLEH", f(10), "muted");
+        schoolSubLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        schoolSubLabel.setVisible(!collapsed);
 
-        brandBox.add(logo);
-        brandBox.add(Box.createVerticalStrut(6));
-        brandBox.add(appTitle);
+        brandBox.add(logoLabel);
+        brandBox.add(Box.createVerticalStrut(4));
+        brandBox.add(appTitleLabel);
         brandBox.add(Box.createVerticalStrut(2));
-        brandBox.add(schoolSub);
+        brandBox.add(schoolSubLabel);
 
-        // Bar gelap 3 tombol vertikal ala Web TKA: Dasbor | Pengaturan | Keluar
-        quickBar = new JPanel(new GridLayout(1, 3, 2, 0)) {
+        // Bar gelap 3 tombol cepat (Dasbor | Pengaturan | Keluar) - ikon saja saat minimize
+        quickBar = new JPanel(new GridLayout(collapsed ? 3 : 1, collapsed ? 1 : 3, 2, 2)) {
             @Override
             protected void paintComponent(Graphics g) {
                 g.setColor(new Color(44, 62, 80));
@@ -233,17 +240,26 @@ final class AppShell {
             }
         };
         quickBar.setOpaque(false);
-        quickBar.setBorder(BorderFactory.createEmptyBorder(6, 6, 6, 6));
-        quickBar.add(new TkaQuickButton("Dasbor", "home", () -> showPage("dashboard")));
-        quickBar.add(new TkaQuickButton("Pengaturan", "gear", () -> ProfileDialog.show(this)));
-        quickBar.add(new TkaQuickButton("Keluar", "exit", this::confirmLogout));
+        quickBar.setBorder(BorderFactory.createEmptyBorder(5, 6, 5, 6));
+
+        quickButtons.clear();
+        TkaQuickButton bHome = new TkaQuickButton("Dasbor", "home", () -> showPage("dashboard"));
+        TkaQuickButton bGear = new TkaQuickButton("Pengaturan", "gear", () -> ProfileDialog.show(this));
+        TkaQuickButton bExit = new TkaQuickButton("Keluar", "exit", this::confirmLogout);
+        quickButtons.add(bHome);
+        quickButtons.add(bGear);
+        quickButtons.add(bExit);
+        for (TkaQuickButton qb : quickButtons) {
+            qb.collapsed = collapsed;
+            qb.setToolTipText(qb.getText());
+            quickBar.add(qb);
+        }
 
         topTkaHeader.add(brandBox, BorderLayout.CENTER);
         topTkaHeader.add(quickBar, BorderLayout.SOUTH);
 
-        // 2. Daftar Menu Utama dengan Section Label
-        navList = p(new GridLayout(0, 1, 0, 3));
-        navList.setBorder(BorderFactory.createEmptyBorder(6, 10, 10, 10));
+        navList = p(new GridLayout(0, 1, 0, 4));
+        navList.setBorder(BorderFactory.createEmptyBorder(8, 10, 10, 10));
         JPanel navWrap = p(new BorderLayout());
         navWrap.add(navList, BorderLayout.NORTH);
 
@@ -253,7 +269,8 @@ final class AppShell {
         navScroll.getViewport().setOpaque(false);
         navScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
 
-        collapseButton = new IconButton("chevL");
+        collapseButton = new IconButton(collapsed ? "chevR" : "chevL");
+        collapseButton.setToolTipText(collapsed ? "Perluas sidebar" : "Perkecil sidebar");
         collapseButton.setPreferredSize(new Dimension(40, 34));
         collapseButton.addActionListener(e -> toggleSidebar());
         JPanel bottom = p(new BorderLayout());
@@ -268,18 +285,8 @@ final class AppShell {
 
     private void toggleSidebar() {
         collapsed = !collapsed;
-        sidebar.setPreferredSize(new Dimension(collapsed ? 78 : 255, 0));
-        brandBox.setVisible(!collapsed);
-        quickBar.setVisible(!collapsed);
-        for (JComponent sec : sectionHeaders) {
-            sec.setVisible(!collapsed);
-        }
-        for (NavButton b : navButtons) {
-            b.collapsed = collapsed;
-            b.setToolTipText(collapsed ? b.getText() : null);
-        }
+        applySidebarState();
         rebuildNavList();
-        collapseButton.setType(collapsed ? "chevR" : "chevL");
         sidebar.revalidate();
         if (sidebar.getParent() != null) {
             sidebar.getParent().revalidate();
@@ -287,6 +294,30 @@ final class AppShell {
         sidebar.repaint();
         root.revalidate();
         SwingUtilities.invokeLater(() -> Theme.pokeScrollBars(root));
+    }
+
+    private void applySidebarState() {
+        sidebar.setPreferredSize(new Dimension(collapsed ? 78 : 255, 0));
+        logoLabel.setIcon(logoIcon(collapsed ? 38 : 62));
+        appTitleLabel.setVisible(!collapsed);
+        schoolSubLabel.setVisible(!collapsed);
+
+        quickBar.setLayout(new GridLayout(collapsed ? 3 : 1, collapsed ? 1 : 3, 2, 2));
+        for (TkaQuickButton qb : quickButtons) {
+            qb.collapsed = collapsed;
+            qb.setPreferredSize(new Dimension(collapsed ? 60 : 70, collapsed ? 32 : 50));
+            qb.repaint();
+        }
+
+        for (JComponent sec : sectionHeaders) {
+            sec.setVisible(!collapsed);
+        }
+        for (NavButton b : navButtons) {
+            b.collapsed = collapsed;
+            b.setToolTipText(collapsed ? b.getText() : null);
+        }
+        collapseButton.setType(collapsed ? "chevR" : "chevL");
+        collapseButton.setToolTipText(collapsed ? "Perluas sidebar" : "Perkecil sidebar");
     }
 
     private EdgePanel buildTopBar() {
@@ -424,6 +455,7 @@ final class AppShell {
     private NavEntry addGroup(String text, int icon) {
         NavButton header = newNavButton(text, icon, "group:" + text);
         header.group = true;
+        header.expanded = true;
         header.addActionListener(e -> {
             header.expanded = !header.expanded;
             rebuildNavList();
@@ -453,12 +485,15 @@ final class AppShell {
     private void rebuildNavList() {
         navList.removeAll();
         sectionHeaders.clear();
-        navList.add(makeSectionHeader("MENU UTAMA"));
+        if (!collapsed) {
+            navList.add(makeSectionHeader("MENU UTAMA"));
+        }
         for (NavEntry entry : navEntries) {
             if (entry.children.isEmpty()) {
                 navList.add(entry.button);
                 continue;
             }
+            // Saat sidebar minimize, tampilkan langsung sub-menu (Akun Guru & Progres Guru)
             if (!collapsed) {
                 navList.add(entry.button);
             }
@@ -468,9 +503,12 @@ final class AppShell {
                 }
             }
         }
-        navList.add(makeSectionHeader("MANAJEMEN PENGGUNA"));
+        if (!collapsed) {
+            navList.add(makeSectionHeader("MANAJEMEN PENGGUNA"));
+        }
         NavButton akunBtn = new NavButton("Pengaturan Akun", 2, "account");
         akunBtn.collapsed = collapsed;
+        akunBtn.setToolTipText(collapsed ? "Pengaturan Akun" : null);
         akunBtn.addActionListener(e -> ProfileDialog.show(this));
         navList.add(akunBtn);
 
@@ -478,9 +516,9 @@ final class AppShell {
         navList.repaint();
     }
 
-    /** Tombol cepat di bar gelap sidebar ala Web TKA (Dasbor | Pengaturan | Keluar). */
     private static final class TkaQuickButton extends JButton {
         private final String iconType;
+        boolean collapsed;
         private boolean hover;
 
         TkaQuickButton(String text, String iconType, Runnable action) {
@@ -492,7 +530,7 @@ final class AppShell {
             setOpaque(false);
             setForeground(Color.WHITE);
             setFont(f(11));
-            setPreferredSize(new Dimension(70, 50));
+            setPreferredSize(new Dimension(60, 32));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             addMouseListener(new MouseAdapter() {
                 @Override
@@ -523,7 +561,7 @@ final class AppShell {
             g2.setColor(Color.WHITE);
             g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             int cx = w / 2;
-            int iy = 8;
+            int iy = collapsed ? (h - 14) / 2 : 8;
             if ("home".equals(iconType)) {
                 g2.drawPolygon(new int[]{cx - 8, cx, cx + 8}, new int[]{iy + 8, iy + 1, iy + 8}, 3);
                 g2.drawRect(cx - 5, iy + 8, 10, 7);
@@ -536,8 +574,10 @@ final class AppShell {
                 g2.drawLine(cx + 5, iy + 4, cx + 8, iy + 7);
                 g2.drawLine(cx + 5, iy + 10, cx + 8, iy + 7);
             }
-            FontMetrics fm = g2.getFontMetrics();
-            g2.drawString(getText(), (w - fm.stringWidth(getText())) / 2, h - 7);
+            if (!collapsed) {
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString(getText(), (w - fm.stringWidth(getText())) / 2, h - 7);
+            }
             g2.dispose();
         }
     }
