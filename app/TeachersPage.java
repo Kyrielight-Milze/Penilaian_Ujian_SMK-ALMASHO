@@ -3,6 +3,7 @@ package app;
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,9 +13,10 @@ import static app.Theme.f;
 import static app.Theme.fb;
 import static app.Ui.*;
 
-/** Operator: kelola akun guru dengan tampilan tabel dan toolbar simbol ala Web TKA. */
+/** Operator: kelola akun guru dengan ikon vektor dan rekap data tercentang. */
 final class TeachersPage extends Page {
     private final JCheckBox selectAllBox = new JCheckBox();
+    private JButton rekapBtn;
     private final JTextField searchInput = new JTextField(18);
     private final JComboBox<Integer> pageSizeBox = new JComboBox<>(new Integer[]{10, 20, 50, 100});
     private final JTextField pageInput = new JTextField("1", 3);
@@ -34,6 +36,7 @@ final class TeachersPage extends Page {
     void onShow() {
         selectAllBox.setSelected(false);
         applyFilterAndRender();
+        updateRekapButtonLabel();
     }
 
     @Override
@@ -51,7 +54,10 @@ final class TeachersPage extends Page {
             BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
             BorderFactory.createEmptyBorder(12, 18, 12, 18)
         ));
-        cardHeader.add(label("\u25A4  Data Akun Guru", fb(14), "title"), BorderLayout.WEST);
+        JLabel titleLbl = label("Data Akun Guru", fb(14), "title");
+        titleLbl.setIcon(new VectorIcon("table", 15, Theme.text()));
+        titleLbl.setIconTextGap(8);
+        cardHeader.add(titleLbl, BorderLayout.WEST);
         mainCard.add(cardHeader, BorderLayout.NORTH);
 
         JPanel centerArea = p(new BorderLayout());
@@ -62,27 +68,22 @@ final class TeachersPage extends Page {
         JPanel leftTools = p(new FlowLayout(FlowLayout.LEFT, 8, 0));
         selectAllBox.setOpaque(false);
         selectAllBox.setToolTipText("Pilih Semua");
-        selectAllBox.addActionListener(e -> tableModel.setAllChecked(selectAllBox.isSelected()));
-
-        JButton rekapBtn = makeSymbolBtn("\u25A4 Rekap \u25BE", "Rekap Akun Guru", false, null);
-        rekapBtn.setPreferredSize(new Dimension(92, 32));
-        rekapBtn.addActionListener(e -> {
-            JPopupMenu menu = new JPopupMenu();
-            menu.setBackground(Theme.surface());
-            menu.add(new JMenuItem("Total Akun Guru: " + DataStore.TEACHERS.size() + " guru"));
-            menu.show(rekapBtn, 0, rekapBtn.getHeight() + 4);
+        selectAllBox.addActionListener(e -> {
+            tableModel.setAllChecked(selectAllBox.isSelected());
+            updateRekapButtonLabel();
         });
 
-        JButton addBtn = makeSymbolBtn("+", "Tambah Akun Guru", true, new Color(22, 163, 74));
-        addBtn.setFont(fb(16));
+        rekapBtn = makeIconTextBtn("Rekap", new VectorIcon("table", 14, Theme.text()), "Rekap Akun Guru Terpilih");
+        rekapBtn.setPreferredSize(new Dimension(115, 32));
+        rekapBtn.addActionListener(e -> handleRekapAction());
+
+        JButton addBtn = makeSymbolBtn(new VectorIcon("plus", 15, Color.WHITE), "Tambah Akun Guru", new Color(22, 163, 74));
         addBtn.addActionListener(e -> openTeacherFormDialog(null));
 
-        JButton editBtn = makeSymbolBtn("\u270E", "Edit Akun Guru Terpilih", true, new Color(234, 179, 8));
-        editBtn.setFont(fb(15));
+        JButton editBtn = makeSymbolBtn(new VectorIcon("pencil", 15, Color.WHITE), "Edit Akun Guru Terpilih", new Color(234, 179, 8));
         editBtn.addActionListener(e -> handleEditSelected());
 
-        JButton deleteBtn = makeSymbolBtn("\uD83D\uDDD1", "Hapus Akun Guru Terpilih", true, new Color(220, 38, 38));
-        deleteBtn.setFont(f(14));
+        JButton deleteBtn = makeSymbolBtn(new VectorIcon("trash", 15, Color.WHITE), "Hapus Akun Guru Terpilih", new Color(220, 38, 38));
         deleteBtn.addActionListener(e -> handleDeleteSelected());
 
         leftTools.add(selectAllBox);
@@ -102,7 +103,7 @@ final class TeachersPage extends Page {
             }
         });
 
-        JButton searchBtn = makeSymbolBtn("\uD83D\uDD0D Cari", "Cari Guru", false, null);
+        JButton searchBtn = makeIconTextBtn("Cari", new VectorIcon("search", 13, Theme.text()), "Cari Guru");
         searchBtn.setPreferredSize(new Dimension(78, 32));
         searchBtn.addActionListener(e -> {
             currentPage = 1;
@@ -117,6 +118,8 @@ final class TeachersPage extends Page {
         centerArea.add(toolbar, BorderLayout.NORTH);
 
         configureTable();
+        tableModel.addTableModelListener(e -> updateRekapButtonLabel());
+
         JScrollPane tableScroll = new JScrollPane(table);
         tableScroll.setBorder(BorderFactory.createMatteBorder(1, 0, 1, 0, Theme.border()));
         tableScroll.getViewport().setBackground(Theme.surface());
@@ -128,11 +131,12 @@ final class TeachersPage extends Page {
         footerBar.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
 
         JPanel leftPage = p(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        JButton firstBtn = makePageBtn("|<");
-        JButton prevBtn = makePageBtn("<");
-        JButton nextBtn = makePageBtn(">");
-        JButton lastBtn = makePageBtn(">|");
-        JButton reloadBtn = makePageBtn("\u21BB");
+        JButton firstBtn = makePageBtn("|<", null);
+        JButton prevBtn = makePageBtn("<", null);
+        JButton nextBtn = makePageBtn(">", null);
+        JButton lastBtn = makePageBtn(">|", null);
+        JButton reloadBtn = makePageBtn("", new VectorIcon("refresh", 13, Theme.text()));
+        reloadBtn.setToolTipText("Muat ulang data");
 
         pageInput.setHorizontalAlignment(SwingConstants.CENTER);
         pageInput.setFont(f(12));
@@ -196,6 +200,112 @@ final class TeachersPage extends Page {
         mainCard.add(footerBar, BorderLayout.SOUTH);
 
         return pageShell("Akun Guru", "Kelola akun login guru dan mata pelajaran yang diampu", mainCard);
+    }
+
+    private void updateRekapButtonLabel() {
+        if (rekapBtn == null) {
+            return;
+        }
+        int checkedCount = tableModel.getCheckedRecords().size();
+        int rowCount = tableModel.getRowCount();
+        selectAllBox.setSelected(rowCount > 0 && checkedCount == rowCount);
+        if (checkedCount > 0) {
+            rekapBtn.setText("Rekap (" + checkedCount + ")");
+            rekapBtn.setBackground(Theme.accentSoft());
+            rekapBtn.setForeground(Theme.accentText());
+        } else {
+            rekapBtn.setText("Rekap");
+            rekapBtn.setBackground(Theme.input());
+            rekapBtn.setForeground(Theme.text());
+        }
+    }
+
+    private void handleRekapAction() {
+        List<TeacherRecord> checked = tableModel.getCheckedRecords();
+        if (!checked.isEmpty()) {
+            showRekapDialog(checked, "Rekap Data Guru Terpilih (" + checked.size() + " Guru)");
+        } else {
+            JPopupMenu menu = new JPopupMenu();
+            menu.setBackground(Theme.surface());
+            menu.add(new JMenuItem("Total Semua Guru: " + DataStore.TEACHERS.size() + " guru"));
+            menu.addSeparator();
+            JMenuItem allItem = new JMenuItem("Buka Tabel Rekap Semua Guru...");
+            allItem.addActionListener(ev -> showRekapDialog(filteredList, "Rekap Semua Akun Guru (" + filteredList.size() + " Guru)"));
+            menu.add(allItem);
+            menu.show(rekapBtn, 0, rekapBtn.getHeight() + 4);
+        }
+    }
+
+    private void showRekapDialog(List<TeacherRecord> list, String title) {
+        JDialog dialog = new JDialog(app.frame(), title, Dialog.ModalityType.APPLICATION_MODAL);
+
+        int totalMapel = 0;
+        for (TeacherRecord t : list) {
+            totalMapel += t.subjects.size();
+        }
+
+        JPanel summaryBar = p(new FlowLayout(FlowLayout.LEFT, 14, 6));
+        summaryBar.add(label("Total Guru Terpilih: " + list.size() + " guru", fb(13), "title"));
+        summaryBar.add(label("• Total Mata Pelajaran Diampu: " + totalMapel + " mapel", f(12), "muted"));
+
+        String[] cols = {"No", "Nama Guru", "Username (Gmail)", "Mata Pelajaran", "Jumlah Mapel"};
+        Object[][] data = new Object[list.size()][cols.length];
+        for (int i = 0; i < list.size(); i++) {
+            TeacherRecord t = list.get(i);
+            data[i][0] = i + 1;
+            data[i][1] = t.name.isEmpty() ? t.username : t.name;
+            data[i][2] = t.username;
+            data[i][3] = t.subjectsText();
+            data[i][4] = t.subjects.size() + " mapel";
+        }
+
+        JTable rekapTable = new JTable(new DefaultTableModel(data, cols) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        });
+        rekapTable.setRowHeight(32);
+        rekapTable.setFont(f(12));
+        rekapTable.getTableHeader().setFont(fb(12));
+        rekapTable.getColumnModel().getColumn(0).setMaxWidth(45);
+        rekapTable.getColumnModel().getColumn(4).setMaxWidth(100);
+
+        JScrollPane scroll = new JScrollPane(rekapTable);
+
+        AppButton copyBtn = new AppButton("Salin Rekap", false);
+        copyBtn.addActionListener(e -> {
+            StringBuilder sb = new StringBuilder();
+            sb.append(title).append("\n\n");
+            for (int i = 0; i < list.size(); i++) {
+                TeacherRecord t = list.get(i);
+                String nama = t.name.isEmpty() ? t.username : t.name;
+                sb.append(i + 1).append(". ").append(nama)
+                  .append(" (").append(t.username).append(") - Mapel: ")
+                  .append(t.subjectsText()).append("\n");
+            }
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(new StringSelection(sb.toString()), null);
+            AppDialog.show(dialog, AppDialog.SUCCESS, "Tersalin", "Rekap data guru terpilih berhasil disalin ke clipboard.");
+        });
+
+        AppButton closeBtn = new AppButton("Tutup", true);
+        closeBtn.addActionListener(e -> dialog.dispose());
+
+        JPanel footer = p(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        footer.add(copyBtn);
+        footer.add(closeBtn);
+
+        JPanel body = p(new BorderLayout(0, 12));
+        body.setBorder(BorderFactory.createEmptyBorder(18, 20, 18, 20));
+        body.add(summaryBar, BorderLayout.NORTH);
+        body.add(scroll, BorderLayout.CENTER);
+        body.add(footer, BorderLayout.SOUTH);
+
+        dialog.setContentPane(body);
+        Theme.apply(body);
+        dialog.setSize(720, 420);
+        dialog.setLocationRelativeTo(app.frame());
+        dialog.setVisible(true);
     }
 
     private void configureTable() {
@@ -263,27 +373,32 @@ final class TeachersPage extends Page {
         });
     }
 
-    private JButton makeSymbolBtn(String text, String tooltip, boolean colored, Color bg) {
-        JButton btn = new JButton(text);
+    private JButton makeSymbolBtn(Icon icon, String tooltip, Color bg) {
+        JButton btn = new JButton(icon);
         btn.setToolTipText(tooltip);
         btn.setFocusPainted(false);
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        btn.setPreferredSize(new Dimension(34, 32));
-        if (colored && bg != null) {
-            btn.setBackground(bg);
-            btn.setForeground(Color.WHITE);
-            btn.setBorder(BorderFactory.createLineBorder(bg));
-        } else {
-            btn.setBackground(Theme.input());
-            btn.setForeground(Theme.text());
-            btn.setFont(fb(12));
-            btn.setBorder(BorderFactory.createLineBorder(Theme.border()));
-        }
+        btn.setPreferredSize(new Dimension(36, 32));
+        btn.setBackground(bg);
+        btn.setBorder(BorderFactory.createLineBorder(bg));
         return btn;
     }
 
-    private JButton makePageBtn(String text) {
-        JButton btn = new JButton(text);
+    private JButton makeIconTextBtn(String text, Icon icon, String tooltip) {
+        JButton btn = new JButton(text, icon);
+        btn.setToolTipText(tooltip);
+        btn.setFocusPainted(false);
+        btn.setIconTextGap(6);
+        btn.setFont(fb(12));
+        btn.setBackground(Theme.input());
+        btn.setForeground(Theme.text());
+        btn.setBorder(BorderFactory.createLineBorder(Theme.border()));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return btn;
+    }
+
+    private JButton makePageBtn(String text, Icon icon) {
+        JButton btn = icon != null ? new JButton(icon) : new JButton(text);
         btn.setFont(f(11));
         btn.setFocusPainted(false);
         btn.setMargin(new Insets(3, 8, 3, 8));
@@ -478,6 +593,7 @@ final class TeachersPage extends Page {
 
         List<TeacherRecord> slice = (total == 0) ? new ArrayList<>() : filteredList.subList(start, end);
         tableModel.setData(slice, start + 1);
+        updateRekapButtonLabel();
 
         pageInput.setText(String.valueOf(currentPage));
         totalPageLabel.setText("dari " + totalPages);

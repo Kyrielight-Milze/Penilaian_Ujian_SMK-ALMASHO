@@ -16,7 +16,7 @@ import static app.Theme.fb;
 import static app.Theme.quality;
 import static app.Ui.*;
 
-/** Jendela utama: sidebar minimized saat awal dibuka, top bar, navigasi, dan perpindahan halaman. */
+/** Jendela utama: sidebar penuh dengan sub-menu Data Guru tertutup (panah kanan) saat awal dibuka. */
 final class AppShell {
     private JFrame frame;
     private final CardLayout rootCards = new CardLayout();
@@ -34,8 +34,8 @@ final class AppShell {
     private final List<TkaQuickButton> quickButtons = new ArrayList<>();
     private JPanel navList;
     private IconButton collapseButton;
-    // Sidebar otomatis dalam mode minimize saat aplikasi pertama kali dibuka
-    private boolean collapsed = true;
+    // Sidebar terbuka penuh saat awal aplikasi dibuka
+    private boolean collapsed = false;
     private final List<NavButton> navButtons = new ArrayList<>();
 
     private static final class NavEntry {
@@ -134,8 +134,8 @@ final class AppShell {
         activeRole = role;
         refreshUser();
 
-        // Pastikan sidebar dimulai dalam keadaan minimize setiap kali masuk
-        collapsed = true;
+        // Sidebar tampil penuh, dan grup Data Guru mulai dalam keadaan tertutup (panah kanan '>')
+        collapsed = false;
         applySidebarState();
         buildNav(role);
 
@@ -175,7 +175,9 @@ final class AppShell {
                 c.active = c.key.equals(key);
                 childOn |= c.active;
             }
-            entry.button.expanded = true;
+            if (childOn) {
+                entry.button.expanded = true;
+            }
             entry.button.childActive = childOn;
         }
         rebuildNavList();
@@ -230,7 +232,6 @@ final class AppShell {
         brandBox.add(Box.createVerticalStrut(2));
         brandBox.add(schoolSubLabel);
 
-        // Bar gelap 3 tombol cepat (Dasbor | Pengaturan | Keluar) - ikon saja saat minimize
         quickBar = new JPanel(new GridLayout(collapsed ? 3 : 1, collapsed ? 1 : 3, 2, 2)) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -251,6 +252,7 @@ final class AppShell {
         quickButtons.add(bExit);
         for (TkaQuickButton qb : quickButtons) {
             qb.collapsed = collapsed;
+            qb.setPreferredSize(new Dimension(collapsed ? 60 : 70, collapsed ? 32 : 50));
             qb.setToolTipText(qb.getText());
             quickBar.add(qb);
         }
@@ -455,7 +457,8 @@ final class AppShell {
     private NavEntry addGroup(String text, int icon) {
         NavButton header = newNavButton(text, icon, "group:" + text);
         header.group = true;
-        header.expanded = true;
+        // Mulai dalam posisi tertutup (tanda panah mengarah ke kanan '>')
+        header.expanded = false;
         header.addActionListener(e -> {
             header.expanded = !header.expanded;
             rebuildNavList();
@@ -493,7 +496,6 @@ final class AppShell {
                 navList.add(entry.button);
                 continue;
             }
-            // Saat sidebar minimize, tampilkan langsung sub-menu (Akun Guru & Progres Guru)
             if (!collapsed) {
                 navList.add(entry.button);
             }
@@ -530,7 +532,7 @@ final class AppShell {
             setOpaque(false);
             setForeground(Color.WHITE);
             setFont(f(11));
-            setPreferredSize(new Dimension(60, 32));
+            setPreferredSize(new Dimension(70, 50));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             addMouseListener(new MouseAdapter() {
                 @Override
