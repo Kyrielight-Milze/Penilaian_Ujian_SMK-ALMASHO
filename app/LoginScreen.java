@@ -22,7 +22,7 @@ import static app.Theme.fi;
 import static app.Theme.quality;
 
 /**
- * Halaman login (kartu di atas latar lembut dengan watermark logo). Warnanya mengikuti tema
+ * Halaman login SINA (kartu di atas latar lembut dengan watermark logo). Warnanya mengikuti tema
  * terang/gelap aplikasi (Theme.dark), jadi selaras dengan halaman di dalam.
  * Peran dikenali otomatis dari akun.
  */
@@ -92,7 +92,8 @@ final class LoginScreen extends Page {
 
         JLabel logo = new JLabel(logoIcon(64));
         logo.setHorizontalAlignment(SwingConstants.CENTER);
-        JLabel title = text("Aplikasi Pendataan Siswa", fb(24), LoginScreen::ink, SwingConstants.CENTER);
+        JLabel title = text("SINA", fb(28), LoginScreen::ink, SwingConstants.CENTER);
+        JLabel subtitle = text("Sistem Informasi Nilai & Akademik", fb(13), LoginScreen::slate, SwingConstants.CENTER);
         JLabel school = text("SMK Al Malikus Sholeh", f(13), LoginScreen::slate, SwingConstants.CENTER);
         JLabel tagline = text("Berotak Teknologi, Berhati Qur'ani", fi(14), LoginScreen::tagline,
             SwingConstants.CENTER);
@@ -162,10 +163,11 @@ final class LoginScreen extends Page {
         JPanel info = new Banner(LoginScreen::infoFill, LoginScreen::sky, "i", infoText);
 
         int row = 0;
-        put(card, logo, row++, 8);
-        put(card, title, row++, 2);
+        put(card, logo, row++, 6);
+        put(card, title, row++, 1);
+        put(card, subtitle, row++, 2);
         put(card, school, row++, 4);
-        put(card, tagline, row++, 18);
+        put(card, tagline, row++, 16);
         put(card, text("Nama pengguna", fb(13), LoginScreen::ink, SwingConstants.LEFT), row++, 7);
         put(card, userField, row++, 16);
         put(card, text("Kata sandi", fb(13), LoginScreen::ink, SwingConstants.LEFT), row++, 7);

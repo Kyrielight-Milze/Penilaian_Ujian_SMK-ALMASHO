@@ -11,7 +11,7 @@ import static app.Theme.fb;
 import static app.Theme.fi;
 import static app.Ui.*;
 
-/** Ringkasan data. Isi kartu statistik menyesuaikan peran pengguna. */
+/** Ringkasan data SINA. Isi kartu statistik menyesuaikan peran pengguna. */
 final class DashboardPage extends Page {
     private final JLabel[] statCaption = new JLabel[3];
     private final JLabel[] statValue = new JLabel[3];
@@ -30,7 +30,7 @@ final class DashboardPage extends Page {
     JPanel view() {
         Pill pill = new Pill("SELAMAT DATANG");
         pill.setAlignmentX(Component.LEFT_ALIGNMENT);
-        JLabel heroTitle = label("Aplikasi Pendataan Siswa", fb(28), "title");
+        JLabel heroTitle = label("SINA — Sistem Informasi Nilai & Akademik", fb(26), "title");
         JLabel heroTagline = label("Berotak Teknologi, Berhati Qur'ani", fi(16), "gold");
         heroDescription = label(" ", f(13), "muted");
 
@@ -64,7 +64,7 @@ final class DashboardPage extends Page {
 
         JPanel body = p(new BorderLayout());
         body.add(box, BorderLayout.NORTH);
-        return pageShell("Dashboard", "Ringkasan data aplikasi pendataan siswa", body);
+        return pageShell("Dashboard", "Ringkasan data SINA (Sistem Informasi Nilai & Akademik)", body);
     }
 
     private void refreshDashboard() {

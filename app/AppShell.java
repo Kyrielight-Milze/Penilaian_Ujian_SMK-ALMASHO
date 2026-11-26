@@ -16,7 +16,7 @@ import static app.Theme.fb;
 import static app.Theme.quality;
 import static app.Ui.*;
 
-/** Jendela utama: sidebar penuh dengan sub-menu Data Guru tertutup (panah kanan) saat awal dibuka. */
+/** Jendela utama SINA: sidebar penuh dengan sub-menu Data Guru tertutup (panah kanan) saat awal dibuka. */
 final class AppShell {
     private JFrame frame;
     private final CardLayout rootCards = new CardLayout();
@@ -29,6 +29,7 @@ final class AppShell {
     private EdgePanel sidebar;
     private JLabel logoLabel;
     private JLabel appTitleLabel;
+    private JLabel appDescLabel;
     private JLabel schoolSubLabel;
     private JPanel quickBar;
     private final List<TkaQuickButton> quickButtons = new ArrayList<>();
@@ -78,7 +79,7 @@ final class AppShell {
     }
 
     void start() {
-        frame = new JFrame("Aplikasi Pendataan Siswa - SMK Al Malikus Sholeh");
+        frame = new JFrame("SINA - Sistem Informasi Nilai & Akademik | SMK Al Malikus Sholeh");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         pages.setOpaque(false);
@@ -202,7 +203,7 @@ final class AppShell {
         frame.getRootPane().setDefaultButton(login.defaultButton());
     }
 
-    // ===================== SIDEBAR ALA WEB TKA =====================
+    // ===================== SIDEBAR SINA =====================
     private EdgePanel buildSidebar() {
         EdgePanel sb = new EdgePanel(new BorderLayout(0, 0), true, true);
         sb.setPreferredSize(new Dimension(collapsed ? 78 : 255, 0));
@@ -217,18 +218,24 @@ final class AppShell {
         logoLabel = new JLabel(logoIcon(collapsed ? 38 : 62));
         logoLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        appTitleLabel = label("APLIKASI PENDATAAN SISWA", fb(11), "title");
+        appTitleLabel = label("SINA", fb(15), "title");
         appTitleLabel.setForeground(new Color(41, 128, 185));
         appTitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         appTitleLabel.setVisible(!collapsed);
 
-        schoolSubLabel = label("SMK AL MALIKUS SHOLEH", f(10), "muted");
+        appDescLabel = label("Sistem Informasi Nilai & Akademik", f(10), "muted");
+        appDescLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        appDescLabel.setVisible(!collapsed);
+
+        schoolSubLabel = label("SMK AL MALIKUS SHOLEH", fb(9.5f), "muted");
         schoolSubLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         schoolSubLabel.setVisible(!collapsed);
 
         brandBox.add(logoLabel);
         brandBox.add(Box.createVerticalStrut(4));
         brandBox.add(appTitleLabel);
+        brandBox.add(Box.createVerticalStrut(1));
+        brandBox.add(appDescLabel);
         brandBox.add(Box.createVerticalStrut(2));
         brandBox.add(schoolSubLabel);
 
@@ -302,6 +309,7 @@ final class AppShell {
         sidebar.setPreferredSize(new Dimension(collapsed ? 78 : 255, 0));
         logoLabel.setIcon(logoIcon(collapsed ? 38 : 62));
         appTitleLabel.setVisible(!collapsed);
+        appDescLabel.setVisible(!collapsed);
         schoolSubLabel.setVisible(!collapsed);
 
         quickBar.setLayout(new GridLayout(collapsed ? 3 : 1, collapsed ? 1 : 3, 2, 2));
