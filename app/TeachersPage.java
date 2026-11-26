@@ -1,0 +1,610 @@
+package app;
+
+import javax.swing.*;
+import javax.swing.table.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.List;
+
+import app.Components.*;
+import static app.Theme.f;
+import static app.Theme.fb;
+import static app.Ui.*;
+
+/** Operator: kelola akun guru dengan tampilan tabel dan toolbar simbol ala Web TKA. */
+final class TeachersPage extends Page {
+    private final JCheckBox selectAllBox = new JCheckBox();
+    private final JTextField searchInput = new JTextField(18);
+    private final JComboBox<Integer> pageSizeBox = new JComboBox<>(new Integer[]{10, 20, 50, 100});
+    private final JTextField pageInput = new JTextField("1", 3);
+    private final JLabel totalPageLabel = label("dari 1", f(12), "muted");
+    private final JLabel infoCountLabel = label("Menampilkan data 0-0 dari 0", f(12), "muted");
+
+    private final TeacherTableModel tableModel = new TeacherTableModel();
+    private final JTable table = new JTable(tableModel);
+    private List<TeacherRecord> filteredList = new ArrayList<>();
+    private int currentPage = 1;
+
+    TeachersPage(AppShell app) {
+        super(app);
+    }
+
+    @Override
+    void onShow() {
+        selectAllBox.setSelected(false);
+        applyFilterAndRender();
+    }
+
+    @Override
+    void reset() {
+        currentPage = 1;
+        searchInput.setText("");
+    }
+
+    @Override
+    JPanel view() {
+        RoundPanel mainCard = card(new BorderLayout(0, 0), 14, 0, false);
+
+        JPanel cardHeader = p(new BorderLayout());
+        cardHeader.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
+            BorderFactory.createEmptyBorder(12, 18, 12, 18)
+        ));
+        cardHeader.add(label("\u25A4  Data Akun Guru", fb(14), "title"), BorderLayout.WEST);
+        mainCard.add(cardHeader, BorderLayout.NORTH);
+
+        JPanel centerArea = p(new BorderLayout());
+
+        JPanel toolbar = p(new BorderLayout(10, 6));
+        toolbar.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
+
+        JPanel leftTools = p(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        selectAllBox.setOpaque(false);
+        selectAllBox.setToolTipText("Pilih Semua");
+        selectAllBox.addActionListener(e -> tableModel.setAllChecked(selectAllBox.isSelected()));
+
+        JButton rekapBtn = makeSymbolBtn("\u25A4 Rekap \u25BE", "Rekap Akun Guru", false, null);
+        rekapBtn.setPreferredSize(new Dimension(92, 32));
+        rekapBtn.addActionListener(e -> {
+            JPopupMenu menu = new JPopupMenu();
+            menu.setBackground(Theme.surface());
+            menu.add(new JMenuItem("Total Akun Guru: " + DataStore.TEACHERS.size() + " guru"));
+            menu.show(rekapBtn, 0, rekapBtn.getHeight() + 4);
+        });
+
+        JButton addBtn = makeSymbolBtn("+", "Tambah Akun Guru", true, new Color(22, 163, 74));
+        addBtn.setFont(fb(16));
+        addBtn.addActionListener(e -> openTeacherFormDialog(null));
+
+        JButton editBtn = makeSymbolBtn("\u270E", "Edit Akun Guru Terpilih", true, new Color(234, 179, 8));
+        editBtn.setFont(fb(15));
+        editBtn.addActionListener(e -> handleEditSelected());
+
+        JButton deleteBtn = makeSymbolBtn("\uD83D\uDDD1", "Hapus Akun Guru Terpilih", true, new Color(220, 38, 38));
+        deleteBtn.setFont(f(14));
+        deleteBtn.addActionListener(e -> handleDeleteSelected());
+
+        leftTools.add(selectAllBox);
+        leftTools.add(rekapBtn);
+        leftTools.add(addBtn);
+        leftTools.add(editBtn);
+        leftTools.add(deleteBtn);
+
+        JPanel rightTools = p(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        searchInput.setFont(f(12));
+        searchInput.setPreferredSize(new Dimension(200, 32));
+        searchInput.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e) {
+                currentPage = 1;
+                applyFilterAndRender();
+            }
+        });
+
+        JButton searchBtn = makeSymbolBtn("\uD83D\uDD0D Cari", "Cari Guru", false, null);
+        searchBtn.setPreferredSize(new Dimension(78, 32));
+        searchBtn.addActionListener(e -> {
+            currentPage = 1;
+            applyFilterAndRender();
+        });
+
+        rightTools.add(searchInput);
+        rightTools.add(searchBtn);
+
+        toolbar.add(leftTools, BorderLayout.WEST);
+        toolbar.add(rightTools, BorderLayout.EAST);
+        centerArea.add(toolbar, BorderLayout.NORTH);
+
+        configureTable();
+        JScrollPane tableScroll = new JScrollPane(table);
+        tableScroll.setBorder(BorderFactory.createMatteBorder(1, 0, 1, 0, Theme.border()));
+        tableScroll.getViewport().setBackground(Theme.surface());
+        centerArea.add(tableScroll, BorderLayout.CENTER);
+
+        mainCard.add(centerArea, BorderLayout.CENTER);
+
+        JPanel footerBar = p(new BorderLayout());
+        footerBar.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 14));
+
+        JPanel leftPage = p(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        JButton firstBtn = makePageBtn("|<");
+        JButton prevBtn = makePageBtn("<");
+        JButton nextBtn = makePageBtn(">");
+        JButton lastBtn = makePageBtn(">|");
+        JButton reloadBtn = makePageBtn("\u21BB");
+
+        pageInput.setHorizontalAlignment(SwingConstants.CENTER);
+        pageInput.setFont(f(12));
+        pageInput.setPreferredSize(new Dimension(42, 26));
+        pageInput.addActionListener(e -> {
+            try {
+                int p = Integer.parseInt(pageInput.getText().trim());
+                currentPage = Math.max(1, Math.min(p, getTotalPages()));
+            } catch (NumberFormatException ignored) {
+            }
+            renderPage();
+        });
+
+        firstBtn.addActionListener(e -> {
+            currentPage = 1;
+            renderPage();
+        });
+        prevBtn.addActionListener(e -> {
+            if (currentPage > 1) {
+                currentPage--;
+                renderPage();
+            }
+        });
+        nextBtn.addActionListener(e -> {
+            if (currentPage < getTotalPages()) {
+                currentPage++;
+                renderPage();
+            }
+        });
+        lastBtn.addActionListener(e -> {
+            currentPage = getTotalPages();
+            renderPage();
+        });
+        reloadBtn.addActionListener(e -> {
+            DataStore.reload();
+            onShow();
+        });
+
+        leftPage.add(firstBtn);
+        leftPage.add(prevBtn);
+        leftPage.add(pageInput);
+        leftPage.add(totalPageLabel);
+        leftPage.add(nextBtn);
+        leftPage.add(lastBtn);
+        leftPage.add(reloadBtn);
+        leftPage.add(Box.createHorizontalStrut(8));
+        leftPage.add(infoCountLabel);
+
+        JPanel rightPage = p(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        pageSizeBox.setSelectedItem(20);
+        pageSizeBox.setFont(f(12));
+        pageSizeBox.addActionListener(e -> {
+            currentPage = 1;
+            renderPage();
+        });
+        rightPage.add(label("Jumlah Per Halaman", f(12), "muted"));
+        rightPage.add(pageSizeBox);
+
+        footerBar.add(leftPage, BorderLayout.WEST);
+        footerBar.add(rightPage, BorderLayout.EAST);
+        mainCard.add(footerBar, BorderLayout.SOUTH);
+
+        return pageShell("Akun Guru", "Kelola akun login guru dan mata pelajaran yang diampu", mainCard);
+    }
+
+    private void configureTable() {
+        table.setRowHeight(44);
+        table.setFont(f(12.5f));
+        table.setShowVerticalLines(false);
+        table.setIntercellSpacing(new Dimension(0, 1));
+        table.setFillsViewportHeight(true);
+
+        JTableHeader header = table.getTableHeader();
+        header.setFont(fb(12));
+        header.setPreferredSize(new Dimension(0, 38));
+        header.setReorderingAllowed(false);
+
+        TableColumnModel cm = table.getColumnModel();
+        cm.getColumn(0).setMaxWidth(45);
+        cm.getColumn(1).setMaxWidth(48);
+        cm.getColumn(2).setMaxWidth(58);
+        cm.getColumn(3).setPreferredWidth(210);
+        cm.getColumn(4).setPreferredWidth(210);
+        cm.getColumn(5).setPreferredWidth(280);
+
+        cm.getColumn(2).setCellRenderer((tbl, value, isSelected, hasFocus, row, col) -> {
+            JPanel cell = new JPanel(new GridBagLayout());
+            cell.setBackground(isSelected ? Theme.accentSoft() : Theme.surface());
+            if (value instanceof java.awt.image.BufferedImage) {
+                cell.add(new JLabel(new AvatarIcon("", 30, Theme.ACCENT, Color.WHITE,
+                    (java.awt.image.BufferedImage) value)));
+            } else {
+                JLabel dash = new JLabel("-");
+                dash.setForeground(Theme.muted());
+                cell.add(dash);
+            }
+            return cell;
+        });
+
+        DefaultTableCellRenderer textRenderer = new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable tbl, Object value, boolean isSelected,
+                                                           boolean hasFocus, int row, int column) {
+                super.getTableCellRendererComponent(tbl, value, isSelected, hasFocus, row, column);
+                setBackground(isSelected ? Theme.accentSoft() : Theme.surface());
+                setForeground(isSelected ? Theme.accentText() : Theme.text());
+                setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
+                setHorizontalAlignment(column == 1 ? SwingConstants.CENTER : SwingConstants.LEFT);
+                return this;
+            }
+        };
+        for (int i = 1; i < cm.getColumnCount(); i++) {
+            if (i != 2) {
+                cm.getColumn(i).setCellRenderer(textRenderer);
+            }
+        }
+
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2 && table.getSelectedRow() >= 0) {
+                    TeacherRecord t = tableModel.getRecordAt(table.getSelectedRow());
+                    if (t != null) {
+                        showTeacherDialog(t);
+                    }
+                }
+            }
+        });
+    }
+
+    private JButton makeSymbolBtn(String text, String tooltip, boolean colored, Color bg) {
+        JButton btn = new JButton(text);
+        btn.setToolTipText(tooltip);
+        btn.setFocusPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setPreferredSize(new Dimension(34, 32));
+        if (colored && bg != null) {
+            btn.setBackground(bg);
+            btn.setForeground(Color.WHITE);
+            btn.setBorder(BorderFactory.createLineBorder(bg));
+        } else {
+            btn.setBackground(Theme.input());
+            btn.setForeground(Theme.text());
+            btn.setFont(fb(12));
+            btn.setBorder(BorderFactory.createLineBorder(Theme.border()));
+        }
+        return btn;
+    }
+
+    private JButton makePageBtn(String text) {
+        JButton btn = new JButton(text);
+        btn.setFont(f(11));
+        btn.setFocusPainted(false);
+        btn.setMargin(new Insets(3, 8, 3, 8));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return btn;
+    }
+
+    private void handleEditSelected() {
+        List<TeacherRecord> checked = tableModel.getCheckedRecords();
+        TeacherRecord target = null;
+        if (!checked.isEmpty()) {
+            target = checked.get(0);
+        } else if (table.getSelectedRow() >= 0) {
+            target = tableModel.getRecordAt(table.getSelectedRow());
+        }
+        if (target == null) {
+            warn("Centang atau pilih salah satu baris guru terlebih dahulu.", "Pilih Guru");
+            return;
+        }
+        openTeacherFormDialog(target);
+    }
+
+    private void handleDeleteSelected() {
+        List<TeacherRecord> checked = tableModel.getCheckedRecords();
+        if (checked.isEmpty() && table.getSelectedRow() >= 0) {
+            TeacherRecord sel = tableModel.getRecordAt(table.getSelectedRow());
+            if (sel != null) {
+                checked.add(sel);
+            }
+        }
+        if (checked.isEmpty()) {
+            warn("Centang atau pilih akun guru yang akan dihapus.", "Hapus Guru");
+            return;
+        }
+        String msg = checked.size() == 1
+            ? "Hapus akun " + (checked.get(0).name.isEmpty() ? checked.get(0).username : checked.get(0).name) + "?"
+            : "Hapus " + checked.size() + " akun guru terpilih?";
+        if (!AppDialog.confirm(app.frame(), "Hapus Akun Guru", msg, "Hapus")) {
+            return;
+        }
+        for (TeacherRecord t : checked) {
+            DataStore.removeTeacher(t);
+        }
+        selectAllBox.setSelected(false);
+        onShow();
+    }
+
+    private void openTeacherFormDialog(TeacherRecord editing) {
+        boolean isEdit = (editing != null);
+        JDialog dialog = new JDialog(app.frame(),
+            isEdit ? "Ubah Akun Guru" : "Tambah Akun Guru",
+            Dialog.ModalityType.APPLICATION_MODAL);
+
+        PhotoPicker picker = new PhotoPicker();
+        JTextField nameField = new JTextField(isEdit ? editing.name : "");
+        JTextField userField = new JTextField(isEdit ? editing.username : "");
+        JPasswordField passField = new JPasswordField();
+        SubjectPicker subjectPicker = new SubjectPicker();
+        subjectPicker.refreshSuggestions();
+
+        if (isEdit) {
+            picker.setPhoto(editing.photo);
+            userField.setEditable(false);
+            userField.setForeground(Theme.muted());
+            subjectPicker.setSubjects(editing.subjects);
+        }
+
+        JPanel form = p(new GridBagLayout());
+        addRow(form, 0, "Foto profil", picker);
+        addRow(form, 1, "Nama guru", nameField);
+        addRow(form, 2, "Username (Gmail)", userField);
+        addRow(form, 3, isEdit ? "Password baru (opsional)" : "Password guru", createPasswordControl(passField));
+
+        GridBagConstraints c = new GridBagConstraints();
+        c.gridx = 0;
+        c.gridy = 4;
+        c.gridwidth = 2;
+        c.weightx = 1;
+        c.anchor = GridBagConstraints.WEST;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.insets = new Insets(10, 0, 2, 0);
+        form.add(label("Mata pelajaran", f(13), "muted"), c);
+        c.gridy = 5;
+        c.insets = new Insets(2, 0, 5, 0);
+        form.add(subjectPicker, c);
+
+        AppButton saveBtn = new AppButton(isEdit ? "Simpan Perubahan" : "Tambah Akun Guru", true);
+        AppButton cancelBtn = new AppButton("Batal", false);
+        cancelBtn.addActionListener(e -> dialog.dispose());
+
+        saveBtn.addActionListener(e -> {
+            String nama = nameField.getText().trim();
+            String user = userField.getText().trim();
+            String pass = new String(passField.getPassword());
+            List<String> subjects = subjectPicker.getSubjects();
+
+            if (isEdit) {
+                if (nama.isEmpty()) {
+                    warn("Nama guru wajib diisi.", "Data belum lengkap");
+                    return;
+                }
+                editing.name = nama;
+                if (!pass.isEmpty()) {
+                    editing.password = pass;
+                }
+                editing.subjects.clear();
+                editing.subjects.addAll(subjects);
+                editing.photo = picker.getPhoto();
+                DataStore.updateTeacher(editing);
+                dialog.dispose();
+                onShow();
+                success("Perubahan data guru berhasil disimpan.");
+            } else {
+                if (nama.isEmpty() || user.isEmpty() || pass.isEmpty()) {
+                    warn("Nama, username, dan password guru wajib diisi.", "Data belum lengkap");
+                    return;
+                }
+                if (!isGmail(user)) {
+                    warn("Username harus berupa alamat Gmail, misalnya nama@gmail.com.", "Username tidak valid");
+                    return;
+                }
+                if (DataStore.isUsernameTaken(user)) {
+                    warn("Username tersebut sudah terdaftar.", "Akun duplikat");
+                    return;
+                }
+                TeacherRecord teacher = new TeacherRecord(nama, user, pass);
+                teacher.subjects.addAll(subjects);
+                teacher.photo = picker.getPhoto();
+                DataStore.addTeacher(teacher);
+                dialog.dispose();
+                onShow();
+                success("Akun guru berhasil ditambahkan.");
+            }
+        });
+
+        JPanel btnRow = p(new GridLayout(1, 2, 10, 0));
+        btnRow.add(cancelBtn);
+        btnRow.add(saveBtn);
+
+        JPanel head = p(new GridLayout(0, 1, 0, 2));
+        head.add(label(isEdit ? "Ubah data guru" : "Tambah akun guru", fb(16), "title"));
+        if (isEdit) {
+            head.add(label(EDIT_HINT, f(12), "gold"));
+        }
+
+        JPanel body = p(new BorderLayout(0, 14));
+        body.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+        body.add(head, BorderLayout.NORTH);
+        body.add(formScroll(form), BorderLayout.CENTER);
+        body.add(btnRow, BorderLayout.SOUTH);
+
+        dialog.setContentPane(body);
+        Theme.apply(body);
+        dialog.setSize(520, 520);
+        dialog.setLocationRelativeTo(app.frame());
+        dialog.setVisible(true);
+    }
+
+    private void applyFilterAndRender() {
+        String key = searchInput.getText().trim().toLowerCase();
+        filteredList = new ArrayList<>();
+        for (TeacherRecord t : DataStore.TEACHERS.values()) {
+            boolean matchKey = key.isEmpty()
+                || t.name.toLowerCase().contains(key)
+                || t.username.toLowerCase().contains(key)
+                || t.subjectsText().toLowerCase().contains(key);
+            if (matchKey) {
+                filteredList.add(t);
+            }
+        }
+        renderPage();
+    }
+
+    private int getPageSize() {
+        Integer sz = (Integer) pageSizeBox.getSelectedItem();
+        return sz != null ? sz : 20;
+    }
+
+    private int getTotalPages() {
+        return Math.max(1, (int) Math.ceil((double) filteredList.size() / getPageSize()));
+    }
+
+    private void renderPage() {
+        int total = filteredList.size();
+        int sz = getPageSize();
+        int totalPages = getTotalPages();
+        if (currentPage > totalPages) {
+            currentPage = totalPages;
+        }
+        int start = (currentPage - 1) * sz;
+        int end = Math.min(start + sz, total);
+
+        List<TeacherRecord> slice = (total == 0) ? new ArrayList<>() : filteredList.subList(start, end);
+        tableModel.setData(slice, start + 1);
+
+        pageInput.setText(String.valueOf(currentPage));
+        totalPageLabel.setText("dari " + totalPages);
+        if (total == 0) {
+            infoCountLabel.setText("Menampilkan data 0-0 dari 0");
+        } else {
+            infoCountLabel.setText("Menampilkan data " + (start + 1) + "-" + end + " dari " + total);
+        }
+    }
+
+    private void showTeacherDialog(TeacherRecord t) {
+        String shownName = t.name.isEmpty() ? t.username : t.name;
+        JPanel header = personHeader(shownName, "Guru  \u00B7  " + t.username, t.photo, 56);
+        JPanel info = detailRows(
+            new String[]{"Username", "Password", "Mata pelajaran"},
+            new JComponent[]{
+                valueLabel(t.username, 250),
+                secretRow(t.password),
+                valueLabel(t.subjectsText(), 250)
+            });
+        int action = PersonDialog.show(app.frame(), header, info);
+        if (action == PersonDialog.EDIT) {
+            openTeacherFormDialog(t);
+        } else if (action == PersonDialog.DELETE) {
+            if (AppDialog.confirm(app.frame(), "Hapus Akun Guru",
+                "Hapus akun " + shownName + "? Guru ini tidak bisa login lagi.", "Hapus")) {
+                DataStore.removeTeacher(t);
+                onShow();
+            }
+        }
+    }
+
+    private static final class TeacherTableModel extends AbstractTableModel {
+        private final String[] cols = {"Cek", "No", "Foto", "Nama Guru", "Username (Gmail)", "Mata Pelajaran"};
+        private List<TeacherRecord> rows = new ArrayList<>();
+        private List<Boolean> checks = new ArrayList<>();
+        private int startNumber = 1;
+
+        void setData(List<TeacherRecord> data, int startNumber) {
+            this.rows = new ArrayList<>(data);
+            this.checks = new ArrayList<>();
+            for (int i = 0; i < data.size(); i++) {
+                checks.add(false);
+            }
+            this.startNumber = startNumber;
+            fireTableDataChanged();
+        }
+
+        void setAllChecked(boolean checked) {
+            for (int i = 0; i < checks.size(); i++) {
+                checks.set(i, checked);
+            }
+            fireTableDataChanged();
+        }
+
+        List<TeacherRecord> getCheckedRecords() {
+            List<TeacherRecord> out = new ArrayList<>();
+            for (int i = 0; i < rows.size(); i++) {
+                if (checks.get(i)) {
+                    out.add(rows.get(i));
+                }
+            }
+            return out;
+        }
+
+        TeacherRecord getRecordAt(int row) {
+            return (row >= 0 && row < rows.size()) ? rows.get(row) : null;
+        }
+
+        @Override
+        public int getRowCount() {
+            return rows.size();
+        }
+
+        @Override
+        public int getColumnCount() {
+            return cols.length;
+        }
+
+        @Override
+        public String getColumnName(int col) {
+            return cols[col];
+        }
+
+        @Override
+        public Class<?> getColumnClass(int col) {
+            if (col == 0) {
+                return Boolean.class;
+            }
+            if (col == 2) {
+                return java.awt.image.BufferedImage.class;
+            }
+            return String.class;
+        }
+
+        @Override
+        public boolean isCellEditable(int row, int col) {
+            return col == 0;
+        }
+
+        @Override
+        public void setValueAt(Object aValue, int row, int col) {
+            if (col == 0 && aValue instanceof Boolean) {
+                checks.set(row, (Boolean) aValue);
+                fireTableCellUpdated(row, col);
+            }
+        }
+
+        @Override
+        public Object getValueAt(int row, int col) {
+            TeacherRecord t = rows.get(row);
+            switch (col) {
+                case 0:
+                    return checks.get(row);
+                case 1:
+                    return String.valueOf(startNumber + row);
+                case 2:
+                    return t.photo;
+                case 3:
+                    return t.name.isEmpty() ? t.username : t.name;
+                case 4:
+                    return t.username;
+                case 5:
+                    return t.subjectsText();
+                default:
+                    return "";
+            }
+        }
+    }
+}
