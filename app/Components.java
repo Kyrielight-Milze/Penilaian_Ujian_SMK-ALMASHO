@@ -71,7 +71,8 @@ final class Components {
         JPanel badgeHold = p(new FlowLayout(FlowLayout.LEFT, 0, 0));
         badgeHold.add(badgeLbl);
 
-        JButton closeBtn = new JButton("\u2715") {
+        // Tombol tutup dengan ikon silang vektor murni Graphics2D
+        JButton closeBtn = new JButton() {
             private boolean hover;
 
             {
@@ -79,7 +80,6 @@ final class Components {
                 setBorderPainted(false);
                 setFocusPainted(false);
                 setOpaque(false);
-                setFont(fb(12));
                 setPreferredSize(new Dimension(32, 32));
                 setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 addMouseListener(new MouseAdapter() {
@@ -101,15 +101,19 @@ final class Components {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 quality(g2);
+                int w = getWidth();
+                int h = getHeight();
                 if (hover) {
                     g2.setColor(new Color(239, 68, 68, 45));
-                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                    g2.fillRoundRect(0, 0, w, h, 10, 10);
                 }
                 g2.setColor(hover ? new Color(248, 113, 113) : Theme.muted());
-                g2.setFont(getFont());
-                FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(getText(), (getWidth() - fm.stringWidth(getText())) / 2,
-                    (getHeight() - fm.getHeight()) / 2 + fm.getAscent());
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                int cx = w / 2;
+                int cy = h / 2;
+                int r = 5;
+                g2.drawLine(cx - r, cy - r, cx + r, cy + r);
+                g2.drawLine(cx + r, cy - r, cx - r, cy + r);
                 g2.dispose();
             }
         };
