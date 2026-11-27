@@ -11,11 +11,12 @@ import java.util.List;
 
 import app.Components.*;
 import static app.Components.modalDialog;
+import static app.Components.printTable;
 import static app.Theme.f;
 import static app.Theme.fb;
 import static app.Ui.*;
 
-/** Operator: kelola akun guru dengan ikon vektor, dialog modern, dan nama kapital sebelum tanda koma. */
+/** Operator: kelola akun guru dengan petunjuk klik 2x, info selengkapnya bersih, dan fitur cetak. */
 final class TeachersPage extends Page {
     private final JCheckBox selectAllBox = new JCheckBox();
     private JButton rekapBtn;
@@ -34,7 +35,6 @@ final class TeachersPage extends Page {
         super(app);
     }
 
-    /** Kapitalkan teks sebelum tanda koma pertama, dan biarkan format gelar setelah koma apa adanya. */
     private static String formatTeacherName(String raw) {
         if (raw == null) {
             return "";
@@ -102,7 +102,13 @@ final class TeachersPage extends Page {
         JLabel titleLbl = label("Data Akun Guru", fb(14), "title");
         titleLbl.setIcon(new VectorIcon("table", 15, Theme.text()));
         titleLbl.setIconTextGap(8);
+
+        JLabel hintLbl = label("Petunjuk: Klik 2 kali pada baris data guru untuk melihat info selengkapnya", f(11.5f), "accent");
+        hintLbl.setIcon(new VectorIcon("info", 14, Theme.accentText()));
+        hintLbl.setIconTextGap(6);
+
         cardHeader.add(titleLbl, BorderLayout.WEST);
+        cardHeader.add(hintLbl, BorderLayout.EAST);
         mainCard.add(cardHeader, BorderLayout.NORTH);
 
         JPanel centerArea = p(new BorderLayout());
@@ -118,7 +124,7 @@ final class TeachersPage extends Page {
             updateRekapButtonLabel();
         });
 
-        rekapBtn = makeIconTextBtn("Rekap", new VectorIcon("table", 14, Theme.text()), "Rekap Akun Guru Terpilih");
+        rekapBtn = makeIconTextBtn("Rekap", new VectorIcon("table", 14, Theme.text()), "Rekap & Cetak Akun Guru");
         rekapBtn.setPreferredSize(new Dimension(115, 32));
         rekapBtn.addActionListener(e -> handleRekapAction());
 
@@ -274,7 +280,7 @@ final class TeachersPage extends Page {
             menu.setBackground(Theme.surface());
             menu.add(new JMenuItem("Total Semua Guru: " + DataStore.TEACHERS.size() + " guru"));
             menu.addSeparator();
-            JMenuItem allItem = new JMenuItem("Buka Tabel Rekap Semua Guru...");
+            JMenuItem allItem = new JMenuItem("Buka & Cetak Tabel Rekap Semua Guru...");
             allItem.addActionListener(ev -> showRekapDialog(filteredList, "Rekap Semua Akun Guru (" + filteredList.size() + " Guru)"));
             menu.add(allItem);
             menu.show(rekapBtn, 0, rekapBtn.getHeight() + 4);
@@ -358,11 +364,15 @@ final class TeachersPage extends Page {
             AppDialog.show(dialogRef[0], AppDialog.SUCCESS, "Tersalin", "Rekap data guru terpilih berhasil disalin ke clipboard.");
         });
 
-        AppButton closeBtn = new AppButton("Tutup", true);
+        AppButton printBtn = new AppButton("Cetak / PDF", true);
+        printBtn.addActionListener(e -> printTable(dialogRef[0], rekapTable, title, "SINA - Rekapitulasi Akun Guru"));
+
+        AppButton closeBtn = new AppButton("Tutup", false);
         closeBtn.addActionListener(e -> dialogRef[0].dispose());
 
-        JPanel footer = p(new GridLayout(1, 2, 12, 0));
+        JPanel footer = p(new GridLayout(1, 3, 12, 0));
         footer.add(copyBtn);
+        footer.add(printBtn);
         footer.add(closeBtn);
 
         dialogRef[0] = modalDialog(
@@ -373,8 +383,8 @@ final class TeachersPage extends Page {
             new Color(16, 185, 129),
             content,
             footer,
-            740,
-            460
+            760,
+            470
         );
         dialogRef[0].setVisible(true);
     }
@@ -385,6 +395,7 @@ final class TeachersPage extends Page {
         table.setShowVerticalLines(false);
         table.setIntercellSpacing(new Dimension(0, 1));
         table.setFillsViewportHeight(true);
+        table.setToolTipText("Klik 2 kali pada baris untuk melihat info selengkapnya");
 
         JTableHeader header = table.getTableHeader();
         header.setFont(fb(12));
@@ -676,26 +687,31 @@ final class TeachersPage extends Page {
         }
     }
 
+    /** Info selengkapnya saat klik 2 kali: tanpa tombol Ubah, Tutup, dan Hapus di bawah. */
     private void showTeacherDialog(TeacherRecord t) {
         String shownName = t.name.isEmpty() ? t.username : t.name;
-        JPanel header = personHeader(shownName, "Guru  \u00B7  " + t.username, t.photo, 56);
-        JPanel info = detailRows(
+        JPanel content = p(new BorderLayout(0, 14));
+        content.add(personHeader(shownName, "Guru  \u00B7  " + t.username, t.photo, 58), BorderLayout.NORTH);
+        content.add(detailRows(
             new String[]{"Username", "Password", "Mata pelajaran"},
             new JComponent[]{
-                valueLabel(t.username, 250),
+                valueLabel(t.username, 270),
                 secretRow(t.password),
-                valueLabel(t.subjectsText(), 250)
-            });
-        int action = PersonDialog.show(app.frame(), header, info);
-        if (action == PersonDialog.EDIT) {
-            openTeacherFormDialog(t);
-        } else if (action == PersonDialog.DELETE) {
-            if (AppDialog.confirm(app.frame(), "Hapus Akun Guru",
-                "Hapus akun " + shownName + "? Guru ini tidak bisa login lagi.", "Hapus")) {
-                DataStore.removeTeacher(t);
-                onShow();
-            }
-        }
+                valueLabel(t.subjectsText(), 270)
+            }), BorderLayout.CENTER);
+
+        JDialog dlg = modalDialog(
+            app.frame(),
+            "INFO SELENGKAPNYA",
+            "Detail Akun Guru",
+            "Tekan tombol silang (\u00D7) di kanan atas atau Esc untuk menutup",
+            Theme.ACCENT,
+            content,
+            null,
+            490,
+            345
+        );
+        dlg.setVisible(true);
     }
 
     private static final class TeacherTableModel extends AbstractTableModel {
