@@ -18,8 +18,8 @@ import static app.Theme.fb;
 import static app.Ui.*;
 
 /**
- * Operator: sinkronisasi data induk. Data siswa atau guru diimpor dari file Excel (.xlsx) atau CSV,
- * misalnya hasil ekspor Dapodik. Data yang sudah ada (username/Gmail sama) diperbarui, yang baru ditambahkan.
+ * Operator: sinkronisasi data induk. Mendukung file mentah ekspor Dapodik (daftar_pd & daftar_gtk)
+ * maupun file template Excel (.xlsx) / CSV. Data lama diperbarui, data baru ditambahkan.
  */
 final class SyncPage extends Page {
     private static final String DEFAULT_PASSWORD = "12345678";
@@ -85,8 +85,8 @@ final class SyncPage extends Page {
         addRow(form, 0, "Jenis data", typeInput);
         addRow(form, 1, "File", fileRow);
 
-        JLabel intro = label("<html><div style='width:250px'>Impor data induk dari file Excel (.xlsx) atau CSV, "
-            + "misalnya hasil ekspor Dapodik. Data yang sudah ada diperbarui, data baru ditambahkan.</div></html>",
+        JLabel intro = label("<html><div style='width:250px'>Impor langsung file Excel (.xlsx) hasil unduhan "
+            + "Dapodik (daftar_pd / daftar_gtk) atau file CSV. Data lama diperbarui, data baru ditambahkan.</div></html>",
             f(12), "muted");
         JPanel hintBox = p(new BorderLayout(0, 4));
         hintBox.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
@@ -150,7 +150,7 @@ final class SyncPage extends Page {
         c.insets = new Insets(0, 0, 0, 0);
         body.add(listCard, c);
         return pageShell("Sinkronisasi Data Induk",
-            "Perbarui data siswa dan guru sekaligus dari file Excel atau CSV", body);
+            "Perbarui data siswa dan guru sekaligus dari file Excel Dapodik atau CSV", body);
     }
 
     private boolean isStudent() {
@@ -159,10 +159,10 @@ final class SyncPage extends Page {
 
     private void updateHint() {
         columnsHint.setText(isStudent()
-            ? "<html><div style='width:250px'>Nama, Kelas (10/11/12), Email (Gmail, jadi username), Alamat, Telepon, "
-                + "NISN (jadi kata sandi awal).</div></html>"
-            : "<html><div style='width:250px'>Nama, Email (Gmail, jadi username), Mata Pelajaran "
-                + "(pisahkan dengan koma), NUPTK (jadi kata sandi awal).</div></html>");
+            ? "<html><div style='width:250px'>Mendukung langsung file <b>daftar_pd</b> Dapodik (Nama, Rombel Saat Ini / Kelas, "
+                + "E-Mail, Alamat, HP/Telepon, NISN). Email kosong otomatis dibuatkan akun.</div></html>"
+            : "<html><div style='width:250px'>Mendukung langsung file <b>daftar_gtk</b> Dapodik (Nama, Email, "
+                + "Bidang Studi / Mata Pelajaran, NUPTK/NIP). Email kosong otomatis dibuatkan akun.</div></html>");
     }
 
     // ===================== PILIH FILE & TEMPLATE =====================
@@ -189,7 +189,6 @@ final class SyncPage extends Page {
         }
         File out = new File(fd.getDirectory(), fd.getFile());
         try {
-            // titik koma + BOM supaya langsung rapi saat dibuka di Excel
             String content = "\uFEFF" + (isStudent() ? STUDENT_TEMPLATE : TEACHER_TEMPLATE) + "\r\n";
             Files.write(out.toPath(), content.getBytes(StandardCharsets.UTF_8));
             success("Template disimpan: " + out.getName() + ". Isi datanya lalu pilih file itu untuk disinkronkan.");
@@ -224,26 +223,24 @@ final class SyncPage extends Page {
             }
         }
         if (headerRow < 0) {
-            error("Kolom \"Nama\" tidak ditemukan. Unduh template untuk melihat format yang dibaca.", "Format tidak sesuai");
+            error("Kolom \"Nama\" tidak ditemukan. Pastikan file berasal dari Dapodik atau template SINA.", "Format tidak sesuai");
             return;
         }
         String[] header = table.get(headerRow);
         boolean student = isStudent();
         int cName = col(header, "nama", "namalengkap", "namasiswa", "namaguru", "namapesertadidik", "namapd");
         int cEmail = col(header, "email", "gmail", "emailgmail", "username", "akun");
-        int cClass = col(header, "kelas", "rombel", "rombonganbelajar", "tingkat");
+        int cClass = col(header, "kelas", "rombelsaatini", "rombel", "rombonganbelajar", "tingkat");
         int cAddress = col(header, "alamat", "alamatjalan", "alamatlengkap");
-        int cPhone = col(header, "telepon", "notelepon", "nomortelepon", "hp", "nohp", "nomorhp", "telp");
+        int cHp = col(header, "hp", "nohp", "nomorhp");
+        int cTelp = col(header, "telepon", "notelepon", "nomortelepon", "telp");
         int cPass = col(header, "password", "katasandi", "sandi");
-        int cSecret = col(header, "nisn", "nuptk", "nip", "nik");
-        int cSubjects = col(header, "matapelajaran", "mapel", "pelajaran", "mengajar", "matapelajaranyangdiampu");
+        int cSecret = col(header, "nisn", "nuptk", "nip", "nipd", "nik");
+        int cSubjects = col(header, "matapelajaran", "mapel", "pelajaran", "mengajar",
+            "matapelajaranyangdiampu", "bidangstudi");
 
-        if (cEmail < 0) {
-            error("Kolom Email (Gmail) tidak ditemukan. Kolom ini dipakai sebagai username.", "Format tidak sesuai");
-            return;
-        }
         if (student && cClass < 0) {
-            error("Kolom Kelas tidak ditemukan.", "Format tidak sesuai");
+            error("Kolom Kelas atau Rombel Saat Ini tidak ditemukan.", "Format tidak sesuai");
             return;
         }
 
@@ -252,14 +249,22 @@ final class SyncPage extends Page {
         for (int i = headerRow + 1; i < table.size(); i++) {
             String[] r = table.get(i);
             String name = get(r, cName);
-            String email = get(r, cEmail).toLowerCase();
-            if (name.isEmpty() && email.isEmpty()) {
-                continue; // baris kosong
+            String rawEmail = get(r, cEmail).toLowerCase();
+            if (name.isEmpty() && rawEmail.isEmpty()) {
+                continue; // melewati baris kosong & baris sub-header Ayah/Ibu/Wali pada Dapodik
             }
+            String secret = get(r, cSecret);
             String password = !get(r, cPass).isEmpty() ? get(r, cPass)
-                : (!get(r, cSecret).isEmpty() ? get(r, cSecret) : null);
+                : (!secret.isEmpty() ? secret : null);
+
+            // Jika kolom E-Mail di Dapodik kosong, buat username otomatis dari NISN/NUPTK atau nama
+            String email = !rawEmail.isEmpty() ? rawEmail : buildFallbackEmail(name, secret);
+
+            String hp = get(r, cHp);
+            String phone = !hp.isEmpty() ? hp : get(r, cTelp);
+
             Result res = student
-                ? syncStudent(i + 1, name, email, get(r, cClass), get(r, cAddress), get(r, cPhone), password)
+                ? syncStudent(i + 1, name, email, get(r, cClass), get(r, cAddress), phone, password)
                 : syncTeacher(i + 1, name, email, cSubjects >= 0 ? get(r, cSubjects) : null, password);
             results.add(res);
             tableModel.addRow(new Object[]{res.row, res.name.isEmpty() ? email : res.name, res.note});
@@ -292,11 +297,11 @@ final class SyncPage extends Page {
         if (name.isEmpty()) {
             return new Result(row, name, SKIPPED, "Dilewati: nama kosong");
         }
-        if (!isGmail(email)) {
-            return new Result(row, name, SKIPPED, "Dilewati: email bukan Gmail");
+        if (email.isEmpty()) {
+            return new Result(row, name, SKIPPED, "Dilewati: username tidak valid");
         }
         if (kelas == null) {
-            return new Result(row, name, SKIPPED, "Dilewati: kelas tidak dikenali");
+            return new Result(row, name, SKIPPED, "Dilewati: kelas tidak dikenali (" + classText + ")");
         }
         StudentRecord existing = DataStore.STUDENT_ACCOUNTS.get(email);
         if (existing != null) {
@@ -310,7 +315,7 @@ final class SyncPage extends Page {
                 existing.phone = phone;
             }
             DataStore.updateStudent(existing);
-            return new Result(row, name, UPDATED, "Diperbarui");
+            return new Result(row, name, UPDATED, "Diperbarui (" + email + ")");
         }
         if (DataStore.isUsernameTaken(email)) {
             return new Result(row, name, SKIPPED, "Dilewati: username dipakai akun lain");
@@ -318,38 +323,47 @@ final class SyncPage extends Page {
         StudentRecord s = new StudentRecord(name, kelas, address, email, phone, email,
             password == null ? DEFAULT_PASSWORD : password);
         DataStore.addStudent(s);
-        return new Result(row, name, NEW, "Ditambahkan");
+        return new Result(row, name, NEW, "Ditambahkan (" + email + ")");
     }
 
     private Result syncTeacher(int row, String name, String email, String subjectsText, String password) {
         if (name.isEmpty()) {
             return new Result(row, name, SKIPPED, "Dilewati: nama kosong");
         }
-        if (!isGmail(email)) {
-            return new Result(row, name, SKIPPED, "Dilewati: email bukan Gmail");
+        if (email.isEmpty()) {
+            return new Result(row, name, SKIPPED, "Dilewati: username tidak valid");
         }
         TeacherRecord existing = DataStore.TEACHERS.get(email);
         if (existing != null) {
             existing.name = name;
-            if (subjectsText != null) {
+            if (subjectsText != null && !subjectsText.isEmpty()) {
                 existing.subjects.clear();
                 existing.subjects.addAll(DataStore.parseSubjects(subjectsText));
             }
             DataStore.updateTeacher(existing);
-            return new Result(row, name, UPDATED, "Diperbarui");
+            return new Result(row, name, UPDATED, "Diperbarui (" + email + ")");
         }
         if (DataStore.isUsernameTaken(email)) {
             return new Result(row, name, SKIPPED, "Dilewati: username dipakai akun lain");
         }
         TeacherRecord t = new TeacherRecord(name, email, password == null ? DEFAULT_PASSWORD : password);
-        if (subjectsText != null) {
+        if (subjectsText != null && !subjectsText.isEmpty()) {
             t.subjects.addAll(DataStore.parseSubjects(subjectsText));
         }
         DataStore.addTeacher(t);
-        return new Result(row, name, NEW, "Ditambahkan");
+        return new Result(row, name, NEW, "Ditambahkan (" + email + ")");
     }
 
     // ===================== BANTUAN =====================
+    private static String buildFallbackEmail(String name, String secret) {
+        String idPart = secret == null ? "" : secret.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
+        if (!idPart.isEmpty()) {
+            return idPart + "@gmail.com";
+        }
+        String slug = name == null ? "" : name.toLowerCase().replaceAll("[^a-z0-9]", "");
+        return slug.isEmpty() ? "" : slug + "@gmail.com";
+    }
+
     private static String norm(String s) {
         return s == null ? "" : s.toLowerCase().replaceAll("[^a-z0-9]", "");
     }
@@ -370,7 +384,7 @@ final class SyncPage extends Page {
         return index >= 0 && index < row.length && row[index] != null ? row[index].trim() : "";
     }
 
-    /** "10", "X RPL 1", "XI TKJ", "12.0" menjadi "10", "11", atau "12"; null bila tidak dikenali. */
+    /** "10", "Kelas 11", "X RPL 1", "XI TKJ", "12.0" menjadi "10", "11", atau "12"; null bila tidak dikenali. */
     private static String parseClass(String text) {
         String t = text == null ? "" : text.trim().toUpperCase();
         Matcher m = Pattern.compile("(^|[^0-9])(1[0-2])([^0-9]|$)").matcher(t);
