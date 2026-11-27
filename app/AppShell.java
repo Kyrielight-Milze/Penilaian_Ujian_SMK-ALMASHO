@@ -5,40 +5,20 @@ import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import app.Components.*;
+import static app.Components.modalDialog;
 import static app.Theme.f;
 import static app.Theme.fb;
-import static app.Theme.quality;
 import static app.Ui.*;
 
-/** Jendela utama SINA: sidebar penuh dengan sub-menu Data Guru tertutup (panah kanan) saat awal dibuka. */
+/** Kerangka utama aplikasi SINA: navigasi, informasi saat masuk, dan pergantian tema. */
 final class AppShell {
-    private JFrame frame;
-    private final CardLayout rootCards = new CardLayout();
-    private final JPanel root = new JPanel(rootCards);
-    private final CardLayout pageCards = new CardLayout();
-    private final JPanel pages = new JPanel(pageCards);
-    private final Map<String, Page> registry = new LinkedHashMap<>();
-    private LoginScreen login;
-
-    private EdgePanel sidebar;
-    private JLabel logoLabel;
-    private JLabel appTitleLabel;
-    private JLabel appDescLabel;
-    private JLabel schoolSubLabel;
-    private JPanel quickBar;
-    private final List<TkaQuickButton> quickButtons = new ArrayList<>();
-    private JPanel navList;
-    private IconButton collapseButton;
-    // Sidebar terbuka penuh saat awal aplikasi dibuka
-    private boolean collapsed = false;
-    private final List<NavButton> navButtons = new ArrayList<>();
-
     private static final class NavEntry {
         final NavButton button;
         final List<NavButton> children = new ArrayList<>();
@@ -48,148 +28,332 @@ final class AppShell {
         }
     }
 
-    private final List<NavEntry> navEntries = new ArrayList<>();
-    private final List<JComponent> sectionHeaders = new ArrayList<>();
+    private final JFrame frame;
+    private final CardLayout rootCards = new CardLayout();
+    private final JPanel root = new JPanel(rootCards);
+    private final CardLayout pageCards = new CardLayout();
+    private final JPanel pageContainer = new JPanel(pageCards);
+    private final Map<String, Page> registry = new HashMap<>();
 
-    private JLabel greetingLabel;
-    private TimeIcon timeIcon;
-    private String greetingName = "";
-    private JLabel subGreetingLabel;
-    private JLabel userNameLabel;
-    private JLabel userRoleLabel;
-    private JLabel avatarLabel;
-    private AvatarIcon avatarIcon;
+    private final LoginScreen login;
+    private EdgePanel sidebar;
+    private JPanel navList;
+    private IconButton collapseButton;
     private IconButton themeButton;
     private IconButton soundButton;
+    private JLabel greetingLabel;
+    private JLabel subGreetingLabel;
+    private TimeIcon timeIcon;
     private JPanel userChip;
+    private AvatarIcon avatarIcon;
+    private JLabel avatarLabel;
+    private JLabel userNameLabel;
+    private JLabel userRoleLabel;
 
+    private JLabel logoLabel;
+    private JLabel appTitleLabel;
+    private JLabel appDescLabel;
+    private JLabel schoolSubLabel;
+    private JPanel quickBar;
+    private final List<TkaQuickButton> quickButtons = new ArrayList<>();
+    private final List<JComponent> sectionHeaders = new ArrayList<>();
+
+    private final List<NavButton> navButtons = new ArrayList<>();
+    private final List<NavEntry> navEntries = new ArrayList<>();
+    private boolean collapsed;
     private String activeUsername = "";
     private String activeRole = "";
 
-    JFrame frame() {
-        return frame;
+    AppShell() {
+        frame = new JFrame("SINA - Sistem Informasi Nilai & Akademik | SMK Al Malikus Sholeh");
+        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        frame.setSize(1240, 790);
+        frame.setMinimumSize(new Dimension(980, 650));
+
+        ImageIcon logo = new ImageIcon("logo_SMK_ALMASHO.png");
+        if (logo.getIconWidth() > 0) {
+            frame.setIconImage(logo.getImage());
+        }
+
+        pageContainer.setOpaque(false);
+
+        login = new LoginScreen(this);
+        root.add(login.view(), "login");
+        root.add(buildShell(), "shell");
+
+        register(new DashboardPage(this));
+        register(new TeachersPage(this));
+        register(new ProgressPage(this));
+        register(new StudentsPage(this));
+        register(new SchedulePage(this));
+        register(new SyncPage(this));
+        register(new GradesPage(this));
+        register(new MyDataPage(this));
+        register(new StudentSchedulePage(this));
+
+        frame.setContentPane(root);
+        Theme.apply(root);
+        login.refreshTheme();
+        frame.getRootPane().setDefaultButton(login.defaultButton());
+        frame.setLocationRelativeTo(null);
     }
 
-    String role() {
-        return activeRole;
+    void show() {
+        frame.setVisible(true);
+    }
+
+    JFrame frame() {
+        return frame;
     }
 
     String username() {
         return activeUsername;
     }
 
-    void start() {
-        frame = new JFrame("SINA - Sistem Informasi Nilai & Akademik | SMK Al Malikus Sholeh");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    String role() {
+        return activeRole;
+    }
 
-        pages.setOpaque(false);
-        root.putClientProperty("role", "bg");
-        login = new LoginScreen(this);
-        root.add(login.view(), "login");
-        root.add(buildShell(), "app");
-        frame.setContentPane(root);
-
-        Theme.apply(root);
-        rootCards.show(root, "login");
-
-        frame.setSize(1240, 750);
-        frame.setMinimumSize(new Dimension(1000, 640));
-        frame.setLocationRelativeTo(null);
-        frame.setVisible(true);
-        frame.getRootPane().setDefaultButton(login.defaultButton());
+    private void register(Page page) {
+        registry.put(page.key(), page);
+        pageContainer.add(page.view(), page.key());
     }
 
     private JPanel buildShell() {
-        JPanel shell = p(new BorderLayout());
+        Backdrop shell = new Backdrop(new BorderLayout());
         sidebar = buildSidebar();
-
-        register("dashboard", new DashboardPage(this));
-        register("teachers", new TeachersPage(this));
-        register("students", new StudentsPage(this));
-        register("schedule", new SchedulePage(this));
-        register("grades", new GradesPage(this));
-        register("progress", new ProgressPage(this));
-        register("sync", new SyncPage(this));
-        register("mydata", new MyDataPage(this));
-        register("myschedule", new StudentSchedulePage(this));
-
-        Backdrop content = new Backdrop(new BorderLayout());
-        content.add(pages, BorderLayout.CENTER);
-
         JPanel main = p(new BorderLayout());
         main.add(buildTopBar(), BorderLayout.NORTH);
-        main.add(content, BorderLayout.CENTER);
-
+        main.add(pageContainer, BorderLayout.CENTER);
         shell.add(sidebar, BorderLayout.WEST);
         shell.add(main, BorderLayout.CENTER);
         return shell;
     }
 
-    private void register(String key, Page page) {
-        registry.put(key, page);
-        pages.add(page.view(), key);
-    }
-
+    /** Masuk ke halaman utama dan langsung menampilkan dialog Informasi Kelengkapan Data (ala SS 261). */
     void enter(String role, String username) {
-        activeUsername = username;
         activeRole = role;
-        refreshUser();
-
-        // Sidebar tampil penuh, dan grup Data Guru mulai dalam keadaan tertutup (panah kanan '>')
-        collapsed = false;
-        applySidebarState();
+        activeUsername = username;
+        refreshIdentity();
         buildNav(role);
-
-        frame.getRootPane().setDefaultButton(null);
-        rootCards.show(root, "app");
+        Theme.apply(sidebar);
         showPage("dashboard");
-        frame.revalidate();
-        frame.repaint();
+        rootCards.show(root, "shell");
+        frame.getRootPane().setDefaultButton(null);
+        SwingUtilities.invokeLater(() -> {
+            Theme.pokeScrollBars(root);
+            showLoginInfoDialog();
+        });
     }
 
-    void refreshUser() {
-        String name = DataStore.displayName(activeRole, activeUsername);
-        greetingName = name.trim().split("\\s+")[0];
-        updateGreeting();
-        subGreetingLabel.setText("SMK Al Malikus Sholeh \u00B7 " + activeRole);
-        userNameLabel.setText(name);
+    /** Dialog Informasi Ceklis Kelengkapan Data & Rekap Residu setiap kali akses masuk. */
+    void showLoginInfoDialog() {
+        DataStore.reload();
+        int totalGuru = DataStore.TEACHERS.size();
+        int totalSiswa = DataStore.STUDENTS.size();
+        int totalJadwal = DataStore.SCHEDULES.size();
+        int guruMapelKosong = 0;
+        for (TeacherRecord t : DataStore.TEACHERS.values()) {
+            if (t.subjects.isEmpty()) {
+                guruMapelKosong++;
+            }
+        }
+        int totalResidu = guruMapelKosong;
+
+        JPanel body = p(new BorderLayout(0, 12));
+
+        // 1. Header & daftar ceklis kelengkapan data
+        JPanel checkCard = card(new BorderLayout(0, 0), 12, 0, false);
+        JPanel checkTitleBar = p(new BorderLayout());
+        checkTitleBar.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
+            BorderFactory.createEmptyBorder(10, 14, 10, 14)
+        ));
+        JLabel cTitle = label("Ceklis Kelengkapan Data Akademik", fb(13.5f), "title");
+        cTitle.setHorizontalAlignment(SwingConstants.CENTER);
+        checkTitleBar.add(cTitle, BorderLayout.CENTER);
+        checkCard.add(checkTitleBar, BorderLayout.NORTH);
+
+        JPanel rowsPanel = p(new GridLayout(0, 1, 0, 0));
+        rowsPanel.add(makeCheckRow("Pendaftaran Akun Guru (" + totalGuru + " guru terdaftar)", totalGuru > 0));
+        rowsPanel.add(makeCheckRow("Pemetaan Mata Pelajaran Guru", totalGuru > 0 && guruMapelKosong == 0));
+        rowsPanel.add(makeCheckRow("Pendaftaran Data Peserta Didik (" + totalSiswa + " siswa)", totalSiswa > 0));
+        rowsPanel.add(makeCheckRow("Pengaturan Jadwal Pelajaran (" + totalJadwal + " sesi aktif)", totalJadwal > 0));
+        rowsPanel.add(makeCheckRow("Sinkronisasi Tarik Data Dapodik & Validasi Rombel", totalSiswa > 0 && totalGuru > 0));
+        checkCard.add(rowsPanel, BorderLayout.CENTER);
+
+        // 2. Rekap residu data
+        JPanel residuCard = card(new BorderLayout(0, 0), 12, 0, false);
+        JPanel residuHead = p(new FlowLayout(FlowLayout.CENTER, 8, 8));
+        residuHead.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()));
+        residuHead.add(label("Rekap Residu Data Akademik", fb(13), "title"));
+
+        JLabel statusPill = new JLabel(totalResidu == 0 ? " 0 (Tidak Ada Residu) " : " " + totalResidu + " Perlu Dilengkapi ");
+        statusPill.setOpaque(true);
+        statusPill.setFont(fb(11.5f));
+        statusPill.setForeground(Color.WHITE);
+        statusPill.setBackground(totalResidu == 0 ? new Color(22, 163, 74) : new Color(217, 119, 6));
+        statusPill.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
+        residuHead.add(statusPill);
+        residuCard.add(residuHead, BorderLayout.NORTH);
+
+        JPanel residuList = p(new GridLayout(0, 1, 0, 0));
+        residuList.add(makeCountRow("Residu Guru Belum Memiliki Mata Pelajaran", guruMapelKosong));
+        residuList.add(makeCountRow("Residu Rombel / Kelas Kosong", totalSiswa == 0 ? 1 : 0));
+        residuList.add(makeCountRow("Total Data Residu", totalResidu, true));
+        residuCard.add(residuList, BorderLayout.CENTER);
+
+        // 3. Banner peringatan bawah (kuning lembut ala SS 261)
+        JPanel warnBox = new JPanel(new BorderLayout(8, 0)) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                Theme.quality(g2);
+                g2.setColor(Theme.dark ? new Color(120, 80, 10, 90) : new Color(254, 243, 199));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                g2.setColor(new Color(245, 158, 11, 140));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                g2.dispose();
+            }
+        };
+        warnBox.setOpaque(false);
+        warnBox.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
+        JLabel warnText = new JLabel(
+            "<html><b>Keterangan:</b> Pastikan seluruh ceklis kelengkapan data berstatus hijau dan "
+            + "tidak terdapat data residu sebelum proses pengisian nilai UTS maupun pencetakan laporan.</html>"
+        );
+        warnText.setFont(f(12));
+        warnText.setForeground(Theme.dark ? new Color(253, 230, 138) : new Color(146, 64, 14));
+        warnBox.add(warnText, BorderLayout.CENTER);
+
+        JPanel centerStack = p(new BorderLayout(0, 12));
+        centerStack.add(checkCard, BorderLayout.NORTH);
+        centerStack.add(residuCard, BorderLayout.CENTER);
+        centerStack.add(warnBox, BorderLayout.SOUTH);
+
+        JScrollPane scroll = new JScrollPane(centerStack);
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        body.add(scroll, BorderLayout.CENTER);
+
+        JDialog dlg = modalDialog(
+            frame,
+            "INFORMASI SISTEM",
+            "Informasi Kelengkapan Data",
+            "Ringkasan kesiapan data SINA SMK Al Malikus Sholeh saat akses masuk",
+            Theme.ACCENT,
+            body,
+            null,
+            640,
+            540
+        );
+        dlg.setVisible(true);
+    }
+
+    private JPanel makeCheckRow(String text, boolean ok) {
+        JPanel row = p(new BorderLayout(12, 0));
+        row.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
+            BorderFactory.createEmptyBorder(9, 16, 9, 16)
+        ));
+        row.add(label(text, f(12.5f), "title"), BorderLayout.WEST);
+
+        JComponent badge = new JComponent() {
+            @Override
+            public Dimension getPreferredSize() {
+                return new Dimension(22, 22);
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                Theme.quality(g2);
+                g2.setColor(ok ? new Color(22, 163, 74) : new Color(234, 179, 8));
+                g2.fillOval(1, 1, 20, 20);
+                g2.setColor(Color.WHITE);
+                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                if (ok) {
+                    g2.drawPolyline(new int[]{6, 10, 16}, new int[]{11, 15, 7}, 3);
+                } else {
+                    g2.drawLine(11, 6, 11, 12);
+                    g2.fillOval(10, 14, 2, 2);
+                }
+                g2.dispose();
+            }
+        };
+        row.add(badge, BorderLayout.EAST);
+        return row;
+    }
+
+    private JPanel makeCountRow(String text, int count) {
+        return makeCountRow(text, count, false);
+    }
+
+    private JPanel makeCountRow(String text, int count, boolean bold) {
+        JPanel row = p(new BorderLayout(12, 0));
+        row.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
+            BorderFactory.createEmptyBorder(8, 16, 8, 16)
+        ));
+        row.add(label(text, bold ? fb(12.5f) : f(12.5f), "title"), BorderLayout.WEST);
+        row.add(label(String.valueOf(count), fb(12.5f), count == 0 ? "muted" : "gold"), BorderLayout.EAST);
+        return row;
+    }
+
+    void refreshIdentity() {
+        String displayName = DataStore.displayName(activeRole, activeUsername);
+        userNameLabel.setText(displayName);
         userRoleLabel.setText(activeRole);
+        BufferedImage photo = DataStore.photoOf(activeRole, activeUsername);
+        avatarIcon.photo = photo;
         avatarIcon.initials = "";
-        avatarIcon.photo = DataStore.photoOf(activeRole, activeUsername);
+        avatarIcon.background = avatarColor(displayName);
         avatarLabel.repaint();
+        updateGreeting();
     }
 
-    private void updateGreeting() {
-        if (activeRole.isEmpty()) {
+    void updateGreeting() {
+        if (greetingLabel == null) {
             return;
         }
-        greetingLabel.setText(greeting() + ", " + greetingName);
-        timeIcon.repaint();
+        String name = DataStore.displayName(activeRole, activeUsername);
+        greetingLabel.setText(greeting() + ", " + firstWord(name));
+        subGreetingLabel.setText("SMK Al Malikus Sholeh \u00B7 " + activeRole);
+        if (timeIcon != null) {
+            timeIcon.repaint();
+        }
     }
 
     void showPage(String key) {
-        DataStore.reload();
+        Page target = registry.get(key);
+        if (target == null) {
+            return;
+        }
+        target.onShow();
+        pageCards.show(pageContainer, key);
+        for (NavButton b : navButtons) {
+            b.active = b.key.equals(key);
+        }
         for (NavEntry entry : navEntries) {
-            entry.button.active = entry.button.key.equals(key);
-            boolean childOn = false;
+            boolean anyChild = false;
             for (NavButton c : entry.children) {
-                c.active = c.key.equals(key);
-                childOn |= c.active;
+                if (c.active) {
+                    anyChild = true;
+                    break;
+                }
             }
-            if (childOn) {
+            entry.button.childActive = anyChild;
+            if (anyChild && !entry.button.expanded) {
                 entry.button.expanded = true;
+                rebuildNavList();
             }
-            entry.button.childActive = childOn;
         }
-        rebuildNavList();
-        Page page = registry.get(key);
-        if (page != null) {
-            page.onShow();
-        }
-        pageCards.show(pages, key);
+        sidebar.repaint();
+        SwingUtilities.invokeLater(() -> Theme.pokeScrollBars(pageContainer));
     }
 
-    private void confirmLogout() {
+    void confirmLogout() {
         if (!AppDialog.confirm(frame, "Konfirmasi Logout", "Anda yakin ingin keluar dari akun ini?", "Logout")) {
             return;
         }
@@ -203,7 +367,6 @@ final class AppShell {
         frame.getRootPane().setDefaultButton(login.defaultButton());
     }
 
-    // ===================== SIDEBAR SINA =====================
     private EdgePanel buildSidebar() {
         EdgePanel sb = new EdgePanel(new BorderLayout(0, 0), true, true);
         sb.setPreferredSize(new Dimension(collapsed ? 78 : 255, 0));
@@ -405,11 +568,15 @@ final class AppShell {
         JPopupMenu menu = new JPopupMenu();
         menu.setBackground(Theme.surface());
         menu.setBorder(new LineBorder(Theme.border(), 1));
+        JMenuItem info = menuItem("Info Kelengkapan Data");
+        info.addActionListener(e -> showLoginInfoDialog());
         JMenuItem profil = menuItem("Profil");
         profil.addActionListener(e -> ProfileDialog.show(this));
         JMenuItem logout = menuItem("Logout");
         logout.addActionListener(e -> confirmLogout());
+        menu.add(info);
         menu.add(profil);
+        menu.addSeparator();
         menu.add(logout);
         menu.show(userChip, 0, userChip.getHeight() + 6);
     }
@@ -424,7 +591,6 @@ final class AppShell {
         return item;
     }
 
-    // ===================== MENU PER PERAN =====================
     private void buildNav(String role) {
         navButtons.clear();
         navEntries.clear();
@@ -436,7 +602,7 @@ final class AppShell {
             addChild(guru, "Progres Guru", 4, "progress");
             addNav("Data Siswa", 1, "students");
             addNav("Jadwal Pelajaran", 3, "schedule");
-            addNav("Sinkronisasi Data Induk", 5, "sync");
+            addNav("Tarik Data Dapodik", 5, "sync");
         } else if ("Guru".equals(role)) {
             addNav("Dasbor", 0, "dashboard");
             addNav("Nilai UTS Siswa", 1, "grades");
@@ -465,7 +631,6 @@ final class AppShell {
     private NavEntry addGroup(String text, int icon) {
         NavButton header = newNavButton(text, icon, "group:" + text);
         header.group = true;
-        // Mulai dalam posisi tertutup (tanda panah mengarah ke kanan '>')
         header.expanded = false;
         header.addActionListener(e -> {
             header.expanded = !header.expanded;
