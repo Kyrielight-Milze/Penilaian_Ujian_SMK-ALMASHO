@@ -21,11 +21,7 @@ import static app.Theme.fb;
 import static app.Theme.fi;
 import static app.Theme.quality;
 
-/**
- * Halaman login SINA (kartu di atas latar lembut dengan watermark logo). Warnanya mengikuti tema
- * terang/gelap aplikasi (Theme.dark), jadi selaras dengan halaman di dalam.
- * Peran dikenali otomatis dari akun.
- */
+/** Halaman login SINA dengan panel animasi informasi di kiri dan kartu masuk di kanan. */
 final class LoginScreen extends Page {
     private static final Color RED = new Color(220, 38, 38);
     private static final Color SKY = new Color(14, 165, 233);
@@ -40,7 +36,7 @@ final class LoginScreen extends Page {
     private Card card;
     private Image logoImage;
 
-    // ----- warna yang mengikuti tema (dibaca ulang setiap kali digambar) -----
+    // ----- warna yang mengikuti tema -----
     private static boolean dk()          { return Theme.dark; }
     private static Color ink()           { return Theme.text(); }
     private static Color slate()         { return Theme.muted(); }
@@ -57,7 +53,6 @@ final class LoginScreen extends Page {
     private static Color red()           { return RED; }
     private static Color sky()           { return SKY; }
 
-    /** Daftar pekerjaan yang dijalankan ulang saat tema berganti. */
     private final List<Runnable> themed = new ArrayList<>();
     private LightBackdrop screen;
 
@@ -70,7 +65,6 @@ final class LoginScreen extends Page {
         r.run();
     }
 
-    /** Dipanggil saat tema diganti dari dalam aplikasi, supaya halaman login ikut selaras. */
     void refreshTheme() {
         for (Runnable r : themed) {
             r.run();
@@ -88,17 +82,26 @@ final class LoginScreen extends Page {
         screen = new LightBackdrop(logoImage);
         screen.putClientProperty("noTheme", Boolean.TRUE);
 
+        // ================= PANEL KIRI: ANIMASI TEKS "APA ITU SINA?" =================
+        SinaHeroPanel heroInfo = new SinaHeroPanel(logoImage, () -> AppDialog.show(
+            app.frame(),
+            AppDialog.INFO,
+            "Tentang SINA - SMK Al Malikus Sholeh",
+            "SINA (Sistem Informasi Nilai & Akademik) adalah portal terpadu pengelolaan data guru, "
+            + "peserta didik kelas 10–12, tarik data Dapodik, jadwal pembelajaran, serta pelaporan nilai UTS."
+        ));
+
+        // ================= PANEL KANAN: KARTU LOGIN =================
         card = new Card();
 
-        JLabel logo = new JLabel(logoIcon(64));
+        JLabel logo = new JLabel(logoIcon(60));
         logo.setHorizontalAlignment(SwingConstants.CENTER);
-        JLabel title = text("SINA", fb(28), LoginScreen::ink, SwingConstants.CENTER);
-        JLabel subtitle = text("Sistem Informasi Nilai & Akademik", fb(13), LoginScreen::slate, SwingConstants.CENTER);
-        JLabel school = text("SMK Al Malikus Sholeh", f(13), LoginScreen::slate, SwingConstants.CENTER);
-        JLabel tagline = text("Berotak Teknologi, Berhati Qur'ani", fi(14), LoginScreen::tagline,
+        JLabel title = text("SINA", fb(26), LoginScreen::ink, SwingConstants.CENTER);
+        JLabel subtitle = text("Sistem Informasi Nilai & Akademik", fb(12.5f), LoginScreen::slate, SwingConstants.CENTER);
+        JLabel school = text("SMK Al Malikus Sholeh", f(12.5f), LoginScreen::slate, SwingConstants.CENTER);
+        JLabel tagline = text("Berotak Teknologi, Berhati Qur'ani", fi(13.5f), LoginScreen::tagline,
             SwingConstants.CENTER);
 
-        // kolom isian
         JToggleButton eye = new JToggleButton(new LoginEye());
         eye.setToolTipText("Tampilkan atau sembunyikan sandi");
         eye.setContentAreaFilled(false);
@@ -115,7 +118,6 @@ final class LoginScreen extends Page {
         themed(userField::refresh);
         themed(passField::refresh);
 
-        // baris "ingat saya" dan "lupa kata sandi"
         remember.setOpaque(false);
         remember.setFocusPainted(false);
         remember.setFont(f(13));
@@ -149,7 +151,6 @@ final class LoginScreen extends Page {
         options.add(remember, BorderLayout.WEST);
         options.add(forgot, BorderLayout.EAST);
 
-        // banner kesalahan (tersembunyi sampai dibutuhkan)
         errorText = new WrapLabel(f(13), fb(13), LoginScreen::errorInk, 340);
         errorBanner = new Banner(LoginScreen::errorFill, LoginScreen::red, "!", errorText);
         errorBanner.setVisible(false);
@@ -167,14 +168,14 @@ final class LoginScreen extends Page {
         put(card, title, row++, 1);
         put(card, subtitle, row++, 2);
         put(card, school, row++, 4);
-        put(card, tagline, row++, 16);
-        put(card, text("Nama pengguna", fb(13), LoginScreen::ink, SwingConstants.LEFT), row++, 7);
-        put(card, userField, row++, 16);
-        put(card, text("Kata sandi", fb(13), LoginScreen::ink, SwingConstants.LEFT), row++, 7);
-        put(card, passField, row++, 14);
-        put(card, options, row++, 14);
-        put(card, errorBanner, row++, 14);
-        put(card, buttonLogin, row++, 18);
+        put(card, tagline, row++, 14);
+        put(card, text("Nama pengguna", fb(13), LoginScreen::ink, SwingConstants.LEFT), row++, 6);
+        put(card, userField, row++, 14);
+        put(card, text("Kata sandi", fb(13), LoginScreen::ink, SwingConstants.LEFT), row++, 6);
+        put(card, passField, row++, 12);
+        put(card, options, row++, 12);
+        put(card, errorBanner, row++, 12);
+        put(card, buttonLogin, row++, 16);
         put(card, info, row, 0);
 
         DocumentListener clear = new SimpleDoc(this::hideError);
@@ -187,11 +188,26 @@ final class LoginScreen extends Page {
             remember.setSelected(true);
         }
 
-        JPanel center = new JPanel(new GridBagLayout());
-        center.setOpaque(false);
-        center.add(card);
+        // Susun 2 kolom sejajar: kiri panel animasi SINA, kanan kartu login
+        JPanel splitWrap = new JPanel(new GridBagLayout());
+        splitWrap.setOpaque(false);
+        splitWrap.setBorder(BorderFactory.createEmptyBorder(16, 36, 16, 36));
 
-        screen.add(center, BorderLayout.CENTER);
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.gridy = 0;
+        gc.gridx = 0;
+        gc.weightx = 1.0;
+        gc.fill = GridBagConstraints.BOTH;
+        gc.insets = new Insets(0, 0, 0, 28);
+        splitWrap.add(heroInfo, gc);
+
+        gc.gridx = 1;
+        gc.weightx = 0.0;
+        gc.fill = GridBagConstraints.NONE;
+        gc.insets = new Insets(0, 0, 0, 0);
+        splitWrap.add(card, gc);
+
+        screen.add(splitWrap, BorderLayout.CENTER);
         return screen;
     }
 
@@ -215,7 +231,7 @@ final class LoginScreen extends Page {
             showError("Nama pengguna dan kata sandi wajib diisi.");
             return;
         }
-        DataStore.reload(); // ambil akun terbaru dari server sebelum memeriksa login
+        DataStore.reload();
         String role = DataStore.authenticate(username, password);
         if (role == null) {
             showError("Nama pengguna atau kata sandi salah.");
@@ -228,7 +244,6 @@ final class LoginScreen extends Page {
                 PREFS.remove("username");
             }
         } catch (Exception ignored) {
-            // penyimpanan preferensi tidak tersedia; abaikan
         }
         hideError();
         passwordInput.setText("");
@@ -274,9 +289,212 @@ final class LoginScreen extends Page {
         panel.add(c, gc);
     }
 
-    // ===================== KOMPONEN KHUSUS HALAMAN LOGIN =====================
+    // ===================== PANEL ANIMASI "APA ITU SINA?" (ALA SS TKA) =====================
+    private static final class SinaHeroPanel extends JPanel {
+        private static final String[] SLIDE_HEADS = {
+            "Apa Itu Sistem Informasi Nilai & Akademik?",
+            "Transparansi & Akurasi Penilaian Siswa",
+            "Terintegrasi Tarik Data Dapodik & Jadwal"
+        };
+        private static final String[] SLIDE_BODIES = {
+            "Sistem Informasi Nilai & Akademik (SINA) dilatarbelakangi oleh perlunya pelaporan "
+            + "capaian akademik peserta didik yang terstandar, rapi, dan mudah diakses oleh seluruh "
+            + "warga SMK Al Malikus Sholeh.",
+            "Pada pengelolaan evaluasi pembelajaran berbasis kelas, pencatatan nilai UTS yang terpusat "
+            + "menjamin objektivitas, keadilan penilaian, serta kemudahan rekapitulasi bagi guru maupun wali kelas.",
+            "SINA memudahkan operator dan pendidik dalam sinkronisasi tarik data Dapodik, distribusi "
+            + "mata pelajaran, penyusunan jadwal pelajaran, hingga pencetakan laporan resmi."
+        };
+        private static final String[] SLIDE_QUOTES = {
+            "\"Mewujudkan tata kelola administrasi pendidikan yang modern, akuntabel, dan berkarakter Qur'ani.\"",
+            "\"Setiap capaian belajar tercatat secara sistematis untuk mendukung peningkatan mutu lulusan.\"",
+            "\"Satu sistem terpadu bagi Operator, Guru, dan Peserta Didik SMK Al Malikus Sholeh.\""
+        };
 
-    /** Latar gradasi lembut dengan watermark logo. */
+        private int slideIndex = 0;
+        private float alpha = 1.0f;
+        private boolean fadingOut = false;
+        private boolean moreHover = false;
+        private final Rectangle[] indicatorRects = new Rectangle[SLIDE_HEADS.length];
+        private Rectangle moreBtnRect = new Rectangle();
+
+        SinaHeroPanel(Image logo, Runnable onMoreClick) {
+            setOpaque(false);
+            setPreferredSize(new Dimension(560, 560));
+
+            // Timer perpindahan slide otomatis setiap 5.5 detik
+            Timer autoTimer = new Timer(5500, e -> {
+                if (!fadingOut) {
+                    fadingOut = true;
+                }
+            });
+            autoTimer.start();
+
+            // Timer animasi fade & slide halus 30 FPS
+            Timer animTimer = new Timer(30, e -> {
+                if (fadingOut) {
+                    alpha -= 0.08f;
+                    if (alpha <= 0f) {
+                        alpha = 0f;
+                        fadingOut = false;
+                        slideIndex = (slideIndex + 1) % SLIDE_HEADS.length;
+                    }
+                    repaint();
+                } else if (alpha < 1.0f) {
+                    alpha = Math.min(1.0f, alpha + 0.08f);
+                    repaint();
+                }
+            });
+            animTimer.start();
+
+            addMouseMotionListener(new MouseAdapter() {
+                @Override
+                public void mouseMoved(MouseEvent e) {
+                    boolean over = moreBtnRect.contains(e.getPoint());
+                    for (Rectangle r : indicatorRects) {
+                        if (r != null && r.contains(e.getPoint())) {
+                            over = true;
+                            break;
+                        }
+                    }
+                    if (moreBtnRect.contains(e.getPoint()) != moreHover) {
+                        moreHover = moreBtnRect.contains(e.getPoint());
+                        repaint();
+                    }
+                    setCursor(Cursor.getPredefinedCursor(over ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
+                }
+            });
+
+            addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    if (moreBtnRect.contains(e.getPoint())) {
+                        onMoreClick.run();
+                        return;
+                    }
+                    for (int i = 0; i < indicatorRects.length; i++) {
+                        if (indicatorRects[i] != null && indicatorRects[i].contains(e.getPoint())) {
+                            slideIndex = i;
+                            alpha = 0.15f;
+                            fadingOut = false;
+                            repaint();
+                            return;
+                        }
+                    }
+                }
+            });
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            quality(g2);
+            int w = getWidth();
+            int h = getHeight();
+            int padX = 12;
+            int maxW = Math.max(260, w - 24);
+
+            // Header instansi atas kiri
+            int y = Math.max(28, (h - 430) / 2);
+            g2.setFont(fb(11));
+            g2.setColor(Theme.ACCENT);
+            g2.drawString("YAYASAN PENDIDIKAN ISLAM AL MALIKUS SHOLEH", padX, y);
+            y += 18;
+            g2.setFont(fb(13));
+            g2.setColor(ink());
+            g2.drawString("SMK AL MALIKUS SHOLEH  \u00B7  PORTAL AKADEMIK", padX, y);
+            y += 42;
+
+            // Terapkan animasi fade + sedikit geser horizontal (slide)
+            int slideOffset = (int) Math.round((1.0f - alpha) * 18);
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, Math.max(0.05f, alpha)));
+
+            // Judul utama animasi
+            g2.setFont(fb(23));
+            g2.setColor(ink());
+            y = drawWrapped(g2, SLIDE_HEADS[slideIndex], padX + slideOffset, y, maxW, 30);
+            y += 14;
+
+            // Paragraf utama
+            g2.setFont(f(13.5f));
+            g2.setColor(slate());
+            y = drawWrapped(g2, SLIDE_BODIES[slideIndex], padX + slideOffset, y, maxW, 21);
+            y += 18;
+
+            // Kutipan menjorok (mirip blok paragraf kedua pada SS 260)
+            g2.setFont(fi(13));
+            g2.setColor(ink());
+            y = drawWrapped(g2, SLIDE_QUOTES[slideIndex], padX + 42 + slideOffset, y, maxW - 42, 20);
+            y += 30;
+
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
+
+            // Indikator garis slide di tengah (mirip indikator putih/abu di SS 260)
+            int barW = 34;
+            int barH = 4;
+            int gap = 8;
+            int totalBarsW = SLIDE_HEADS.length * barW + (SLIDE_HEADS.length - 1) * gap;
+            int bx = padX + (maxW - totalBarsW) / 2;
+            for (int i = 0; i < SLIDE_HEADS.length; i++) {
+                indicatorRects[i] = new Rectangle(bx, y - 6, barW, barH + 12);
+                g2.setColor(i == slideIndex ? Theme.ACCENT : line());
+                g2.fillRoundRect(bx, y, barW, barH, barH, barH);
+                bx += barW + gap;
+            }
+            y += 24;
+
+            // Tombol lebar "Selengkapnya" di bagian bawah (ala SS 260)
+            int btnH = 46;
+            moreBtnRect = new Rectangle(padX, y, maxW, btnH);
+            g2.setColor(moreHover ? Theme.accentSoft() : (dk() ? new Color(255, 255, 255, 14) : new Color(255, 255, 255, 180)));
+            g2.fillRoundRect(moreBtnRect.x, moreBtnRect.y, moreBtnRect.width, moreBtnRect.height, 14, 14);
+            g2.setColor(moreHover ? Theme.ACCENT : line());
+            g2.setStroke(new BasicStroke(1.3f));
+            g2.drawRoundRect(moreBtnRect.x, moreBtnRect.y, moreBtnRect.width, moreBtnRect.height, 14, 14);
+
+            g2.setFont(fb(14));
+            g2.setColor(ink());
+            String btnLabel = "Selengkapnya";
+            FontMetrics fm = g2.getFontMetrics();
+            int iconR = 8;
+            int totalContentW = iconR * 2 + 10 + fm.stringWidth(btnLabel);
+            int cx = moreBtnRect.x + (moreBtnRect.width - totalContentW) / 2;
+            int cy = moreBtnRect.y + btnH / 2;
+
+            g2.fillOval(cx, cy - iconR, iconR * 2, iconR * 2);
+            g2.setColor(dk() ? Theme.bg() : Color.WHITE);
+            g2.setStroke(new BasicStroke(1.7f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g2.drawLine(cx + 4, cy, cx + 12, cy);
+            g2.drawPolyline(new int[]{cx + 9, cx + 12, cx + 9}, new int[]{cy - 3, cy, cy + 3}, 3);
+
+            g2.setColor(ink());
+            g2.drawString(btnLabel, cx + iconR * 2 + 10, cy - fm.getHeight() / 2 + fm.getAscent());
+
+            g2.dispose();
+        }
+
+        private int drawWrapped(Graphics2D g2, String text, int x, int startY, int maxWidth, int lineHeight) {
+            FontMetrics fm = g2.getFontMetrics();
+            StringBuilder lineBuf = new StringBuilder();
+            int y = startY;
+            for (String word : text.split(" ")) {
+                String test = lineBuf.length() == 0 ? word : lineBuf + " " + word;
+                if (fm.stringWidth(test) > maxWidth && lineBuf.length() > 0) {
+                    g2.drawString(lineBuf.toString(), x, y);
+                    y += lineHeight;
+                    lineBuf = new StringBuilder(word);
+                } else {
+                    lineBuf = new StringBuilder(test);
+                }
+            }
+            if (lineBuf.length() > 0) {
+                g2.drawString(lineBuf.toString(), x, y);
+            }
+            return y;
+        }
+    }
+
+    // ===================== KOMPONEN KHUSUS HALAMAN LOGIN =====================
     private static final class LightBackdrop extends JPanel {
         private final Image logo;
 
@@ -316,18 +534,17 @@ final class LoginScreen extends Page {
         }
     }
 
-    /** Kartu putih bersudut membulat dengan bayangan lembut. */
     private static final class Card extends JPanel {
         Card() {
             super(new GridBagLayout());
             setOpaque(false);
-            setBorder(BorderFactory.createEmptyBorder(6 + 26, 10 + 50, 14 + 26, 10 + 50));
+            setBorder(BorderFactory.createEmptyBorder(26, 46, 28, 46));
         }
 
         @Override
         public Dimension getPreferredSize() {
             Dimension d = super.getPreferredSize();
-            return new Dimension(520, d.height);
+            return new Dimension(490, d.height);
         }
 
         @Override
@@ -351,7 +568,6 @@ final class LoginScreen extends Page {
         }
     }
 
-    /** Kolom isian bulat dengan ikon di kiri dan (opsional) tombol di kanan. */
     private static final class IconField extends JPanel {
         private final JTextField field;
         private boolean focused;
@@ -359,8 +575,8 @@ final class LoginScreen extends Page {
         IconField(JTextField field, int icon, JComponent trailing) {
             super(new BorderLayout());
             setOpaque(false);
-            setPreferredSize(new Dimension(100, 52));
-            setMinimumSize(new Dimension(100, 52));
+            setPreferredSize(new Dimension(100, 50));
+            setMinimumSize(new Dimension(100, 50));
 
             this.field = field;
             field.setOpaque(false);
@@ -384,7 +600,7 @@ final class LoginScreen extends Page {
             JComponent lead = new JComponent() {
                 @Override
                 public Dimension getPreferredSize() {
-                    return new Dimension(50, 52);
+                    return new Dimension(50, 50);
                 }
 
                 @Override
@@ -415,7 +631,6 @@ final class LoginScreen extends Page {
             }
         }
 
-        /** Terapkan warna teks sesuai tema. */
         void refresh() {
             field.setForeground(ink());
             field.setCaretColor(ink());
@@ -452,7 +667,6 @@ final class LoginScreen extends Page {
         }
     }
 
-    /** Kotak informasi/kesalahan: ikon bulat di kiri, teks berbungkus di kanan. */
     private static final class Banner extends JPanel {
         private final Supplier<Color> fill;
         private final Supplier<Color> tone;
@@ -504,7 +718,6 @@ final class LoginScreen extends Page {
         }
     }
 
-    /** Teks yang membungkus baris sendiri. Tanda ** mengapit kata tebal. */
     private static final class WrapLabel extends JComponent {
         private final Font regular;
         private final Font bold;
@@ -575,7 +788,6 @@ final class LoginScreen extends Page {
         }
     }
 
-    /** Tombol navy dengan teks dan panah. */
     private static final class LoginButton extends JButton {
         private boolean hover;
 
@@ -586,8 +798,8 @@ final class LoginScreen extends Page {
             setFocusPainted(false);
             setOpaque(false);
             setFont(fb(15));
-            setPreferredSize(new Dimension(100, 52));
-            setMinimumSize(new Dimension(100, 52));
+            setPreferredSize(new Dimension(100, 50));
+            setMinimumSize(new Dimension(100, 50));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             addMouseListener(new MouseAdapter() {
                 @Override
