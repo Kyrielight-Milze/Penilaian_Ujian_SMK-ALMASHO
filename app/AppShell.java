@@ -86,7 +86,8 @@ final class AppShell {
         register("teachers", new TeachersPage(this));
         register("progress", new ProgressPage(this));
         register("students", new StudentsPage(this));
-        register("schedule", new SchedulePage(this));
+        register("schedule_input", new SchedulePage(this, true));
+        register("schedule", new SchedulePage(this, false));
         register("sync", new SyncPage(this));
         register("grades", new GradesPage(this));
         register("mydata", new MyDataPage(this));
@@ -151,7 +152,7 @@ final class AppShell {
         });
     }
 
-/** Dialog Informasi Ceklis Kelengkapan Data (mengecek otomatis jadwal Senin - Jumat). */
+    /** Dialog Informasi Ceklis Kelengkapan Data (mengecek otomatis jadwal Senin - Jumat). */
     void showLoginInfoDialog() {
         DataStore.reload();
         int totalGuru = DataStore.TEACHERS.size();
@@ -176,7 +177,7 @@ final class AppShell {
         }
         boolean jadwalLengkap = hariTerisi.size() == wajibHari.length;
         String noteJadwal = jadwalLengkap ? null
-            : (hariTerisi.isEmpty() ? "(Belum diisi)" : "(Hanya: " + String.join(", ", hariTerisi) + ")");
+            : (hariTerisi.isEmpty() ? "(Belum diset operator)" : "(Hanya: " + String.join(", ", hariTerisi) + ")");
 
         JPanel stack = new JPanel();
         stack.setOpaque(false);
@@ -196,11 +197,10 @@ final class AppShell {
         checkHeader.add(cTitle, BorderLayout.CENTER);
         checkCard.add(checkHeader);
 
-        // --- DAFTAR BARIS CEKLIS (Edit teks di dalam tanda kutip, atau hapus baris yang tidak perlu) ---
         checkCard.add(makeCheckRow("Pendaftaran Akun Guru (" + totalGuru + " guru terdaftar)", null, totalGuru > 0, false));
         checkCard.add(makeCheckRow("Pemetaan Mata Pelajaran Guru", null, totalGuru > 0 && guruMapelKosong == 0, false));
         checkCard.add(makeCheckRow("Pendaftaran Data Peserta Didik (" + totalSiswa + " siswa)", null, totalSiswa > 0, false));
-        checkCard.add(makeCheckRow("Pengaturan Jadwal Pelajaran & Rombel", noteJadwal, jadwalLengkap, false));
+        checkCard.add(makeCheckRow("Pengaturan Jadwal Ujian & Rombel", noteJadwal, jadwalLengkap, false));
         checkCard.add(makeCheckRow("Sinkronisasi Tarik Data Dapodik", null, totalSiswa > 0 && totalGuru > 0, true));
 
         stack.add(checkCard);
@@ -345,65 +345,6 @@ final class AppShell {
         };
         rightGroup.add(badge);
         row.add(rightGroup, BorderLayout.EAST);
-        return row;
-    }
-
-    private JPanel makeCheckRow(String text, boolean ok, boolean last) {
-        JPanel row = new JPanel(new BorderLayout(12, 0));
-        row.setOpaque(false);
-        row.setBorder(BorderFactory.createCompoundBorder(
-            last ? BorderFactory.createEmptyBorder() : BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
-            BorderFactory.createEmptyBorder(10, 16, 10, 16)
-        ));
-
-        JLabel lbl = new JLabel(text);
-        lbl.setFont(f(12.5f));
-        lbl.setForeground(Theme.text());
-        row.add(lbl, BorderLayout.CENTER);
-
-        JComponent badge = new JComponent() {
-            @Override
-            public Dimension getPreferredSize() {
-                return new Dimension(24, 24);
-            }
-
-            @Override
-            public Dimension getMinimumSize() {
-                return new Dimension(24, 24);
-            }
-
-            @Override
-            protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                quality(g2);
-                int d = 20;
-                int x = (getWidth() - d) / 2;
-                int y = (getHeight() - d) / 2;
-                g2.setColor(ok ? new Color(22, 163, 74) : new Color(217, 119, 6));
-                g2.fillOval(x, y, d, d);
-                g2.setColor(Color.WHITE);
-                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                if (ok) {
-                    g2.drawPolyline(new int[]{x + 5, x + 9, x + 15}, new int[]{y + 10, y + 14, y + 6}, 3);
-                } else {
-                    g2.drawLine(x + 10, y + 5, x + 10, y + 11);
-                    g2.fillOval(x + 9, y + 13, 2, 2);
-                }
-                g2.dispose();
-            }
-        };
-        row.add(badge, BorderLayout.EAST);
-        return row;
-    }
-
-    private JPanel makeCountRow(String text, int count, boolean bold) {
-        JPanel row = p(new BorderLayout(12, 0));
-        row.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
-            BorderFactory.createEmptyBorder(8, 16, 8, 16)
-        ));
-        row.add(label(text, bold ? fb(12.5f) : f(12.5f), "title"), BorderLayout.WEST);
-        row.add(label(String.valueOf(count), fb(12.5f), count == 0 ? "muted" : "gold"), BorderLayout.EAST);
         return row;
     }
 
@@ -720,7 +661,9 @@ final class AppShell {
             addChild(guru, "Akun Guru", 2, "teachers");
             addChild(guru, "Progres Guru", 4, "progress");
             addNav("Data Siswa", 1, "students");
-            addNav("Jadwal Pelajaran", 3, "schedule");
+            NavEntry jadwal = addGroup("Jadwal Ujian", 3);
+            addChild(jadwal, "Input Jadwal", 3, "schedule_input");
+            addChild(jadwal, "Jadwal Ujian", 3, "schedule");
             addNav("Tarik Data Dapodik", 5, "sync");
         } else if ("Guru".equals(role)) {
             addNav("Dasbor", 0, "dashboard");
@@ -728,7 +671,7 @@ final class AppShell {
         } else {
             addNav("Dasbor", 0, "dashboard");
             addNav("Data Saya", 2, "mydata");
-            addNav("Jadwal Pelajaran", 3, "myschedule");
+            addNav("Jadwal Ujian", 3, "myschedule");
         }
         rebuildNavList();
     }

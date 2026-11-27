@@ -24,13 +24,13 @@ import static app.Ui.*;
 
 /**
  * Guru: tabel nilai UTS siswa per mata pelajaran. Nama siswa diberi warna status:
- * merah = belum diisi, kuning = belum lengkap, hijau = sudah terisi. Nilai dibatasi 1 sampai 100.
+ * merah = belum diset guru pengampu, kuning = belum lengkap, hijau = sudah terisi.
  */
 final class GradesPage extends Page {
     private static final Color RED = new Color(239, 68, 68);
     private static final Color YELLOW = new Color(234, 179, 8);
     private static final Color GREEN = new Color(34, 197, 94);
-    private static final String EMPTY = "Belum diisi";
+    private static final String EMPTY = "Belum diset guru pengampu";
 
     private final CardLayout cards = new CardLayout();
     private final JPanel switcher = new JPanel(cards);
@@ -80,7 +80,6 @@ final class GradesPage extends Page {
                 loadSelected();
             }
         });
-        // Klik pada kolom mapel langsung memilih mapel tersebut.
         studentTable.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -112,11 +111,10 @@ final class GradesPage extends Page {
         bottom.add(statusLabel, BorderLayout.NORTH);
         bottom.add(formRow, BorderLayout.CENTER);
 
-        // Keterangan warna + ringkasan di atas tabel
         scopeLabel = label(" ", f(12), "muted");
         summaryLabel = label(" ", f(12), "muted");
         JPanel legend = p(new FlowLayout(FlowLayout.LEFT, 16, 0));
-        legend.add(new LegendItem(RED, "Belum diisi"));
+        legend.add(new LegendItem(RED, "Belum diset guru pengampu"));
         legend.add(new LegendItem(YELLOW, "Belum lengkap"));
         legend.add(new LegendItem(GREEN, "Sudah terisi"));
         JPanel legendRow = p(new BorderLayout());
@@ -131,8 +129,7 @@ final class GradesPage extends Page {
         tableCard.add(new JScrollPane(studentTable), BorderLayout.CENTER);
         tableCard.add(bottom, BorderLayout.SOUTH);
 
-        // Tampilan bila operator belum mengatur mapel guru ini.
-        JLabel noticeTitle = label("Mata pelajaran belum diatur", fb(18), "title");
+        JLabel noticeTitle = label("Mata pelajaran belum diset operator", fb(18), "title");
         noticeTitle.setHorizontalAlignment(SwingConstants.CENTER);
         JLabel noticeText = label("Operator belum menetapkan mata pelajaran untuk akun Anda.", f(13), "muted");
         noticeText.setHorizontalAlignment(SwingConstants.CENTER);
@@ -153,7 +150,6 @@ final class GradesPage extends Page {
             "Pilih siswa pada tabel, lalu isi nilai UTS (1-100) untuk mata pelajaran Anda", switcher);
     }
 
-    /** Hanya angka, tanpa nol di depan, dan tidak bisa lebih dari 100. */
     private static void limitScoreInput(JTextField field) {
         ((PlainDocument) field.getDocument()).setDocumentFilter(new DocumentFilter() {
             @Override
@@ -181,7 +177,6 @@ final class GradesPage extends Page {
         });
     }
 
-    /** Membangun ulang tabel sesuai mapel dan kelas guru yang sedang login. */
     private void refreshView() {
         TeacherRecord teacher = DataStore.TEACHERS.get(app.username());
         subjects = teacher == null ? new ArrayList<>() : new ArrayList<>(teacher.subjects);
@@ -193,8 +188,8 @@ final class GradesPage extends Page {
 
         Set<String> classes = DataStore.classesTaught(teacher);
         scopeLabel.setText(classes.isEmpty()
-            ? "Menampilkan semua siswa karena jadwal mengajar Anda belum diatur."
-            : "Menampilkan siswa kelas " + String.join(", ", classes) + " sesuai jadwal mengajar Anda.");
+            ? "Menampilkan semua siswa karena jadwal ujian Anda belum diset operator."
+            : "Menampilkan siswa kelas " + String.join(", ", classes) + " sesuai jadwal ujian Anda.");
 
         int keepRow = studentTable.getSelectedRow();
         String keepSubject = (String) subjectBox.getSelectedItem();
@@ -250,7 +245,7 @@ final class GradesPage extends Page {
         for (int i = 0; i < studentTable.getColumnCount(); i++) {
             TableColumn column = studentTable.getColumnModel().getColumn(i);
             boolean first = i == 0;
-            column.setPreferredWidth(first ? 280 : 130);
+            column.setPreferredWidth(first ? 280 : 165);
             column.setCellRenderer(first ? new NameRenderer() : new ScoreRenderer());
             column.setHeaderRenderer((table, value, sel, focus, r, c) -> {
                 Component comp = headerBase.getTableCellRendererComponent(table, value, sel, focus, r, c);
@@ -268,7 +263,6 @@ final class GradesPage extends Page {
         }
     }
 
-    /** Mengisi form sesuai siswa yang dipilih dan mapel yang aktif. */
     private void loadSelected() {
         if (updating) {
             return;
@@ -287,7 +281,7 @@ final class GradesPage extends Page {
         studentField.setText(s.name);
         if (g == null) {
             scoreInput.setText("");
-            statusLabel.setText("Nilai " + subject + " untuk " + s.name + " belum diisi.");
+            statusLabel.setText("Nilai " + subject + " untuk " + s.name + ": Belum diset guru pengampu.");
             saveButton.setText("Simpan Nilai UTS");
         } else {
             scoreInput.setText(formatScore(g.score));
@@ -322,12 +316,10 @@ final class GradesPage extends Page {
         success(updated ? "Nilai UTS berhasil diperbarui." : "Nilai UTS berhasil disimpan.");
     }
 
-    // ===================== TAMPILAN SEL =====================
     private static Color tone(int status) {
         return status == 0 ? RED : (status == 1 ? YELLOW : GREEN);
     }
 
-    /** Nama siswa dengan warna status: merah, kuning, atau hijau. */
     private final class NameRenderer extends JComponent implements TableCellRenderer {
         private String text = "";
         private int status;
@@ -361,7 +353,6 @@ final class GradesPage extends Page {
         }
     }
 
-    /** Angka nilai di tengah sel; "Belum diisi" berwarna redup. */
     private static final class ScoreRenderer extends DefaultTableCellRenderer {
         ScoreRenderer() {
             setHorizontalAlignment(SwingConstants.CENTER);
@@ -372,13 +363,12 @@ final class GradesPage extends Page {
                                                        boolean hasFocus, int row, int column) {
             super.getTableCellRendererComponent(table, value, isSelected, false, row, column);
             boolean empty = EMPTY.equals(value);
-            setFont(empty ? f(12) : fb(15));
+            setFont(empty ? f(11.5f) : fb(15));
             setForeground(empty ? Theme.muted() : Theme.accentText());
             return this;
         }
     }
 
-    /** Titik warna + keterangan untuk legenda. */
     private static final class LegendItem extends JComponent {
         private final Color color;
         private final String text;

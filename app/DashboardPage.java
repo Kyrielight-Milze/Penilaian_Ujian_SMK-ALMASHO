@@ -78,7 +78,7 @@ final class DashboardPage extends Page {
         }
 
         if ("Operator".equals(app.role())) {
-            heroDescription.setText("Anda masuk sebagai Operator. Kelola guru, siswa, jadwal, dan sinkronisasi data induk lewat menu di samping.");
+            heroDescription.setText("Anda masuk sebagai Operator. Kelola guru, siswa, jadwal ujian, dan sinkronisasi data induk lewat menu di samping.");
             setStat(0, "Siswa terdaftar", String.valueOf(DataStore.STUDENTS.size()));
             setStat(1, "Guru terdaftar", String.valueOf(DataStore.TEACHERS.size()));
             setStat(2, "Nilai UTS terinput", String.valueOf(gradeCount));
@@ -97,29 +97,31 @@ final class DashboardPage extends Page {
                 }
             }
             heroDescription.setText(mySubjects == 0
-                ? "Anda masuk sebagai Guru. Mata pelajaran Anda belum diatur operator, hubungi operator terlebih dahulu."
+                ? "Anda masuk sebagai Guru. Mata pelajaran Anda belum diset operator, hubungi operator terlebih dahulu."
                 : "Anda masuk sebagai Guru. Pilih mata pelajaran dan input nilai UTS siswa lewat menu di samping.");
             setStat(0, "Siswa terdaftar", String.valueOf(DataStore.STUDENTS.size()));
-            setStat(1, "Mata pelajaran Anda", String.valueOf(mySubjects));
-            setStat(2, "Nilai UTS terinput", String.valueOf(mine));
+            setStat(1, "Mata pelajaran Anda", mySubjects == 0 ? "Belum diset operator" : String.valueOf(mySubjects));
+            setStat(2, "Nilai UTS terinput", mine == 0 ? "Belum diset guru pengampu" : String.valueOf(mine));
         } else {
             StudentRecord me = DataStore.STUDENT_ACCOUNTS.get(app.username());
-            heroDescription.setText("Anda masuk sebagai Siswa. Lihat biodata dan nilai UTS lewat Data Saya, serta jadwal pelajaran lewat menu Jadwal Pelajaran.");
+            heroDescription.setText("Anda masuk sebagai Siswa. Lihat biodata dan nilai UTS lewat Data Saya, serta jadwal ujian lewat menu Jadwal Ujian.");
             if (me != null) {
                 double sum = 0;
                 for (GradeRecord g : me.grades) {
                     sum += g.score;
                 }
-                setStat(0, "Kelas", me.studentClass);
-                setStat(1, "Nilai UTS", String.valueOf(me.grades.size()));
+                setStat(0, "Kelas", me.studentClass == null || me.studentClass.isEmpty() ? "Belum diset operator" : me.studentClass);
+                setStat(1, "Nilai UTS", me.grades.isEmpty() ? "Belum diset guru pengampu" : String.valueOf(me.grades.size()));
                 setStat(2, "Rata-rata nilai",
-                    me.grades.isEmpty() ? "-" : String.format("%.1f", sum / me.grades.size()));
+                    me.grades.isEmpty() ? "Belum diset guru pengampu" : String.format("%.1f", sum / me.grades.size()));
             }
         }
     }
 
     private void setStat(int index, String caption, String value) {
         statCaption[index].setText(caption);
+        boolean unset = value.startsWith("Belum diset");
+        statValue[index].setFont(unset ? fb(16) : fb(30));
         statValue[index].setText(value);
     }
 }
