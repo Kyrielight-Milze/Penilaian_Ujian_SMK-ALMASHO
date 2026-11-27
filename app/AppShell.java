@@ -151,7 +151,7 @@ final class AppShell {
         });
     }
 
-    /** Dialog Informasi Ceklis Kelengkapan Data & Rekap Residu setiap kali akses masuk. */
+/** Dialog Informasi Ceklis Kelengkapan Data & Rekap Residu yang elegan dan proporsional saat akses masuk. */
     void showLoginInfoDialog() {
         DataStore.reload();
         int totalGuru = DataStore.TEACHERS.size();
@@ -164,82 +164,118 @@ final class AppShell {
         }
         int totalResidu = guruMapelKosong + (totalSiswa == 0 ? 1 : 0);
 
-        JPanel body = p(new BorderLayout(0, 12));
+        JPanel stack = new JPanel();
+        stack.setOpaque(false);
+        stack.setLayout(new BoxLayout(stack, BoxLayout.Y_AXIS));
 
-        // 1. Header & daftar ceklis kelengkapan data
-        JPanel checkCard = card(new BorderLayout(0, 0), 12, 0, false);
-        JPanel checkTitleBar = p(new BorderLayout());
-        checkTitleBar.setBorder(BorderFactory.createCompoundBorder(
+        // 1. Kartu Ceklis Kelengkapan Data Akademik
+        JPanel checkCard = makeInfoCard();
+        JPanel checkHeader = new JPanel(new BorderLayout());
+        checkHeader.setOpaque(false);
+        checkHeader.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
-            BorderFactory.createEmptyBorder(10, 14, 10, 14)
+            BorderFactory.createEmptyBorder(11, 16, 11, 16)
         ));
-        JLabel cTitle = label("Ceklis Kelengkapan Data Akademik", fb(13.5f), "title");
-        cTitle.setHorizontalAlignment(SwingConstants.CENTER);
-        checkTitleBar.add(cTitle, BorderLayout.CENTER);
-        checkCard.add(checkTitleBar, BorderLayout.NORTH);
+        JLabel cTitle = new JLabel("Ceklis Kelengkapan Data Akademik", SwingConstants.CENTER);
+        cTitle.setFont(fb(13.5f));
+        cTitle.setForeground(Theme.text());
+        checkHeader.add(cTitle, BorderLayout.CENTER);
+        checkCard.add(checkHeader);
 
-        JPanel rowsPanel = p(new GridLayout(0, 1, 0, 0));
-        rowsPanel.add(makeCheckRow("Pendaftaran Akun Guru (" + totalGuru + " guru terdaftar)", totalGuru > 0));
-        rowsPanel.add(makeCheckRow("Pemetaan Mata Pelajaran Guru", totalGuru > 0 && guruMapelKosong == 0));
-        rowsPanel.add(makeCheckRow("Pendaftaran Data Peserta Didik (" + totalSiswa + " siswa)", totalSiswa > 0));
-        rowsPanel.add(makeCheckRow("Pengaturan Jadwal Pelajaran & Rombel", totalGuru > 0 && totalSiswa > 0));
-        rowsPanel.add(makeCheckRow("Sinkronisasi Tarik Data Dapodik", totalSiswa > 0 && totalGuru > 0));
-        checkCard.add(rowsPanel, BorderLayout.CENTER);
+        checkCard.add(makeCheckRow("Pendaftaran Akun Guru (" + totalGuru + " guru terdaftar)", totalGuru > 0, false));
+        checkCard.add(makeCheckRow("Pemetaan Mata Pelajaran Guru", totalGuru > 0 && guruMapelKosong == 0, false));
+        checkCard.add(makeCheckRow("Pendaftaran Data Peserta Didik (" + totalSiswa + " siswa)", totalSiswa > 0, false));
+        checkCard.add(makeCheckRow("Pengaturan Jadwal Pelajaran & Rombel", totalGuru > 0 && totalSiswa > 0, false));
+        checkCard.add(makeCheckRow("Sinkronisasi Tarik Data Dapodik", totalSiswa > 0 && totalGuru > 0, true));
 
-        // 2. Rekap residu data
-        JPanel residuCard = card(new BorderLayout(0, 0), 12, 0, false);
-        JPanel residuHead = p(new FlowLayout(FlowLayout.CENTER, 8, 8));
+        stack.add(checkCard);
+        stack.add(Box.createVerticalStrut(12));
+
+        // 2. Kartu Rekap Residu Data Akademik
+        JPanel residuCard = makeInfoCard();
+        JPanel residuHead = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 9));
+        residuHead.setOpaque(false);
         residuHead.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()));
-        residuHead.add(label("Rekap Residu Data Akademik", fb(13), "title"));
 
-        JLabel statusPill = new JLabel(totalResidu == 0 ? " 0 (Tidak Ada Residu) " : " " + totalResidu + " Perlu Dilengkapi ");
-        statusPill.setOpaque(true);
-        statusPill.setFont(fb(11.5f));
-        statusPill.setForeground(Color.WHITE);
-        statusPill.setBackground(totalResidu == 0 ? new Color(22, 163, 74) : new Color(217, 119, 6));
-        statusPill.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
-        residuHead.add(statusPill);
-        residuCard.add(residuHead, BorderLayout.NORTH);
+        JLabel rTitle = new JLabel("Rekap Residu Data Akademik");
+        rTitle.setFont(fb(13.5f));
+        rTitle.setForeground(Theme.text());
+        residuHead.add(rTitle);
 
-        JPanel residuList = p(new GridLayout(0, 1, 0, 0));
-        residuList.add(makeCountRow("Residu Guru Belum Memiliki Mata Pelajaran", guruMapelKosong, false));
-        residuList.add(makeCountRow("Residu Peserta Didik Belum Terdaftar", totalSiswa == 0 ? 1 : 0, false));
-        residuList.add(makeCountRow("Total Data Residu", totalResidu, true));
-        residuCard.add(residuList, BorderLayout.CENTER);
-
-        // 3. Banner peringatan bawah
-        JPanel warnBox = new JPanel(new BorderLayout(8, 0)) {
+        JLabel statusPill = new JLabel(totalResidu == 0 ? "0 (Tidak Ada Residu)" : totalResidu + " Perlu Dilengkapi") {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 quality(g2);
-                g2.setColor(Theme.dark ? new Color(120, 80, 10, 90) : new Color(254, 243, 199));
-                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
-                g2.setColor(new Color(245, 158, 11, 140));
-                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                g2.setColor(totalResidu == 0 ? new Color(22, 163, 74) : new Color(217, 119, 6));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
+                g2.dispose();
+                super.paintComponent(g);
+            }
+        };
+        statusPill.setOpaque(false);
+        statusPill.setFont(fb(11.5f));
+        statusPill.setForeground(Color.WHITE);
+        statusPill.setBorder(BorderFactory.createEmptyBorder(3, 10, 3, 10));
+        residuHead.add(statusPill);
+        residuCard.add(residuHead);
+
+        residuCard.add(makeCountRow("Residu Guru Belum Memiliki Mata Pelajaran", guruMapelKosong, false, false));
+        residuCard.add(makeCountRow("Residu Peserta Didik Belum Terdaftar", totalSiswa == 0 ? 1 : 0, false, false));
+        residuCard.add(makeCountRow("Total Data Residu", totalResidu, true, true));
+
+        stack.add(residuCard);
+        stack.add(Box.createVerticalStrut(12));
+
+        // 3. Kotak Keterangan Kuning Lembut
+        JPanel warnBox = new JPanel(new BorderLayout(10, 0)) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                quality(g2);
+                g2.setColor(Theme.dark ? new Color(120, 80, 10, 95) : new Color(254, 243, 199));
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
+                g2.setColor(new Color(245, 158, 11, 150));
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 12, 12);
                 g2.dispose();
             }
         };
         warnBox.setOpaque(false);
+        warnBox.setAlignmentX(Component.LEFT_ALIGNMENT);
         warnBox.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
+
+        JComponent warnIcon = new JComponent() {
+            @Override
+            public Dimension getPreferredSize() {
+                return new Dimension(20, 20);
+            }
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                quality(g2);
+                g2.setColor(new Color(217, 119, 6));
+                g2.fillPolygon(new int[]{10, 1, 19}, new int[]{2, 18, 18}, 3);
+                g2.setColor(Color.WHITE);
+                g2.fillRect(9, 7, 2, 6);
+                g2.fillRect(9, 15, 2, 2);
+                g2.dispose();
+            }
+        };
+        JPanel iconHold = new JPanel(new BorderLayout());
+        iconHold.setOpaque(false);
+        iconHold.add(warnIcon, BorderLayout.NORTH);
+
         JLabel warnText = new JLabel(
-            "<html><b>Keterangan:</b> Pastikan seluruh ceklis kelengkapan data berstatus hijau dan "
-            + "tidak terdapat data residu sebelum proses pengisian nilai UTS maupun pencetakan laporan.</html>"
+            "<html><div style='width:515px; line-height:1.45;'><b>Keterangan:</b> Pastikan seluruh ceklis kelengkapan "
+            + "data berstatus hijau dan tidak terdapat data residu sebelum pengisian nilai UTS maupun pencetakan laporan.</div></html>"
         );
         warnText.setFont(f(12));
         warnText.setForeground(Theme.dark ? new Color(253, 230, 138) : new Color(146, 64, 14));
+
+        warnBox.add(iconHold, BorderLayout.WEST);
         warnBox.add(warnText, BorderLayout.CENTER);
-
-        JPanel centerStack = p(new BorderLayout(0, 12));
-        centerStack.add(checkCard, BorderLayout.NORTH);
-        centerStack.add(residuCard, BorderLayout.CENTER);
-        centerStack.add(warnBox, BorderLayout.SOUTH);
-
-        JScrollPane scroll = new JScrollPane(centerStack);
-        scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        body.add(scroll, BorderLayout.CENTER);
+        stack.add(warnBox);
 
         JDialog dlg = modalDialog(
             frame,
@@ -247,21 +283,45 @@ final class AppShell {
             "Informasi Kelengkapan Data",
             "Ringkasan kesiapan data SINA SMK Al Malikus Sholeh saat akses masuk",
             Theme.ACCENT,
-            body,
+            stack,
             null,
-            640,
-            540
+            630,
+            610
         );
         dlg.setVisible(true);
     }
 
-    private JPanel makeCheckRow(String text, boolean ok) {
-        JPanel row = p(new BorderLayout(12, 0));
+    private JPanel makeInfoCard() {
+        JPanel panel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                quality(g2);
+                g2.setColor(Theme.surface());
+                g2.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 14, 14);
+                g2.setColor(Theme.border());
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 14, 14);
+                g2.dispose();
+            }
+        };
+        panel.setOpaque(false);
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return panel;
+    }
+
+    private JPanel makeCheckRow(String text, boolean ok, boolean last) {
+        JPanel row = new JPanel(new BorderLayout(12, 0));
+        row.setOpaque(false);
         row.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
+            last ? BorderFactory.createEmptyBorder() : BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
             BorderFactory.createEmptyBorder(9, 16, 9, 16)
         ));
-        row.add(label(text, f(12.5f), "title"), BorderLayout.WEST);
+
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(f(12.5f));
+        lbl.setForeground(Theme.text());
+        row.add(lbl, BorderLayout.CENTER);
 
         JComponent badge = new JComponent() {
             @Override
@@ -273,7 +333,7 @@ final class AppShell {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 quality(g2);
-                g2.setColor(ok ? new Color(22, 163, 74) : new Color(234, 179, 8));
+                g2.setColor(ok ? new Color(22, 163, 74) : new Color(217, 119, 6));
                 g2.fillOval(1, 1, 20, 20);
                 g2.setColor(Color.WHITE);
                 g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
@@ -287,6 +347,26 @@ final class AppShell {
             }
         };
         row.add(badge, BorderLayout.EAST);
+        return row;
+    }
+
+    private JPanel makeCountRow(String text, int count, boolean bold, boolean last) {
+        JPanel row = new JPanel(new BorderLayout(12, 0));
+        row.setOpaque(false);
+        row.setBorder(BorderFactory.createCompoundBorder(
+            last ? BorderFactory.createEmptyBorder() : BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
+            BorderFactory.createEmptyBorder(9, 16, 9, 16)
+        ));
+
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(bold ? fb(12.5f) : f(12.5f));
+        lbl.setForeground(Theme.text());
+        row.add(lbl, BorderLayout.CENTER);
+
+        JLabel val = new JLabel(String.valueOf(count), SwingConstants.RIGHT);
+        val.setFont(fb(13f));
+        val.setForeground(count == 0 ? Theme.muted() : new Color(217, 119, 6));
+        row.add(val, BorderLayout.EAST);
         return row;
     }
 
