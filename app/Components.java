@@ -8,15 +8,31 @@ import java.awt.geom.Area;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
+import java.awt.print.PrinterException;
+import java.text.MessageFormat;
 
 import static app.Theme.f;
 import static app.Theme.fb;
 import static app.Theme.quality;
 import static app.Ui.*;
 
-/** Komponen tampilan kustom: tombol, kartu, dialog modern, ikon vektor, dan baris daftar. */
+/** Komponen tampilan kustom: tombol, kartu, dialog modern, ikon vektor, cetak tabel, dan baris daftar. */
 final class Components {
     private Components() {
+    }
+
+    /** Mencetak JTable ke printer atau Simpan sebagai PDF dengan header dan footer rapi. */
+    static void printTable(Component parent, JTable table, String title, String subtitle) {
+        try {
+            MessageFormat header = new MessageFormat(title);
+            MessageFormat footer = new MessageFormat(subtitle + "  |  Halaman {0}");
+            boolean done = table.print(JTable.PrintMode.FIT_WIDTH, header, footer, true, null, true);
+            if (done) {
+                AppDialog.show(parent, AppDialog.SUCCESS, "Cetak Selesai", "Dokumen berhasil dikirim ke printer / PDF.");
+            }
+        } catch (PrinterException ex) {
+            AppDialog.show(parent, AppDialog.ERROR, "Gagal Mencetak", "Terjadi kesalahan saat mencetak: " + ex.getMessage());
+        }
     }
 
     /** Membuat dialog modal kustom tanpa bingkai OS agar serasi dengan tema gelap & terang. */
@@ -27,7 +43,6 @@ final class Components {
 
         DialogBody body = new DialogBody(new BorderLayout(0, 0), tone);
 
-        // Header kustom yang bisa di-drag
         JPanel headerWrap = p(new BorderLayout(0, 12));
         headerWrap.setBorder(BorderFactory.createEmptyBorder(20, 24, 0, 24));
         headerWrap.setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
@@ -71,7 +86,6 @@ final class Components {
         JPanel badgeHold = p(new FlowLayout(FlowLayout.LEFT, 0, 0));
         badgeHold.add(badgeLbl);
 
-        // Tombol tutup dengan ikon silang vektor murni Graphics2D
         JButton closeBtn = new JButton() {
             private boolean hover;
 
@@ -136,20 +150,20 @@ final class Components {
         headerWrap.add(headContent, BorderLayout.CENTER);
         headerWrap.add(new HLine(), BorderLayout.SOUTH);
 
-        // Konten utama
         JPanel centerWrap = p(new BorderLayout());
-        centerWrap.setBorder(BorderFactory.createEmptyBorder(14, 24, 14, 24));
+        centerWrap.setBorder(BorderFactory.createEmptyBorder(14, 24, footer == null ? 22 : 14, 24));
         centerWrap.add(content, BorderLayout.CENTER);
-
-        // Footer tombol aksi
-        JPanel southWrap = p(new BorderLayout(0, 14));
-        southWrap.setBorder(BorderFactory.createEmptyBorder(0, 24, 20, 24));
-        southWrap.add(new HLine(), BorderLayout.NORTH);
-        southWrap.add(footer, BorderLayout.CENTER);
 
         body.add(headerWrap, BorderLayout.NORTH);
         body.add(centerWrap, BorderLayout.CENTER);
-        body.add(southWrap, BorderLayout.SOUTH);
+
+        if (footer != null) {
+            JPanel southWrap = p(new BorderLayout(0, 14));
+            southWrap.setBorder(BorderFactory.createEmptyBorder(0, 24, 20, 24));
+            southWrap.add(new HLine(), BorderLayout.NORTH);
+            southWrap.add(footer, BorderLayout.CENTER);
+            body.add(southWrap, BorderLayout.SOUTH);
+        }
 
         dialog.getRootPane().registerKeyboardAction(
             e -> dialog.dispose(),
@@ -164,7 +178,7 @@ final class Components {
         return dialog;
     }
 
-    /** Ikon vektor murni Graphics2D agar tidak muncul kotak kosong (tofu) pada font. */
+    /** Ikon vektor murni Graphics2D agar tajam dan bebas kotak kosong. */
     static class VectorIcon implements Icon {
         private final String type;
         private final int size;
@@ -195,6 +209,13 @@ final class Components {
             int s = size;
 
             switch (type) {
+                case "info": {
+                    g2.drawOval(x + 1, y + 1, s - 2, s - 2);
+                    int m = x + s / 2;
+                    g2.fillOval(m - 1, y + 4, 2, 2);
+                    g2.drawLine(m, y + 7, m, y + s - 4);
+                    break;
+                }
                 case "table": {
                     g2.drawRoundRect(x + 1, y + 2, s - 2, s - 4, 3, 3);
                     g2.drawLine(x + 1, y + 6, x + s - 1, y + 6);
@@ -235,6 +256,15 @@ final class Components {
                     g2.drawLine(x + s - 7, y + 6, x + s - 3, y + 6);
                     break;
                 }
+                case "print": {
+                    g2.drawRect(x + 4, y + 1, s - 8, 4);
+                    g2.drawRoundRect(x + 1, y + 5, s - 2, s - 8, 3, 3);
+                    g2.setColor(Theme.surface());
+                    g2.fillRect(x + 4, y + s - 6, s - 8, 5);
+                    g2.setColor(color != null ? color : Theme.text());
+                    g2.drawRect(x + 4, y + s - 6, s - 8, 5);
+                    break;
+                }
                 default:
                     break;
             }
@@ -242,7 +272,6 @@ final class Components {
         }
     }
 
-    /** Latar dengan cahaya biru lembut di pojok kiri atas. */
     static class Backdrop extends JPanel {
         Backdrop(LayoutManager layout) {
             super(layout);
@@ -277,7 +306,6 @@ final class Components {
         }
     }
 
-    /** Panel sidebar / top bar dengan garis tepi. */
     static class EdgePanel extends JPanel {
         private final boolean sidebarFill;
         private final boolean rightEdge;
@@ -303,7 +331,6 @@ final class Components {
         }
     }
 
-    /** Kartu bersudut membulat. */
     static class RoundPanel extends JPanel {
         private final int arc;
         private final boolean gradient;
@@ -512,7 +539,6 @@ final class Components {
         }
     }
 
-    /** Tombol ikon: sun, moon, chevL, chevR, chevD, sound, mute. */
     static class IconButton extends JButton {
         private String type;
         private boolean hover;
@@ -643,7 +669,6 @@ final class Components {
         }
     }
 
-    /** Avatar bulat: tampilkan foto jika ada; jika kosong tampilkan ikon siluet tanpa huruf depan. */
     static class AvatarIcon implements Icon {
         String initials;
         Color background;
@@ -723,7 +748,6 @@ final class Components {
         }
     }
 
-    /** Pemilih foto profil dengan siluet avatar rapi dan tombol Pilih File. */
     static class PhotoPicker extends JPanel {
         private BufferedImage photo;
         private final AvatarIcon icon = new AvatarIcon("", 42, new Color(147, 197, 253), new Color(15, 23, 42));

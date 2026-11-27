@@ -1,11 +1,8 @@
-package app;import app.Components.*;
-import static app.Components.modalDialog; // <-- tambahkan baris ini
-import static app.Theme.f;
-import static app.Theme.fb;
-import static app.Ui.*;
+package app;
 
 import javax.swing.*;
 import javax.swing.table.*;
+import javax.swing.text.*;
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.*;
@@ -13,11 +10,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import app.Components.*;
+import static app.Components.modalDialog;
 import static app.Theme.f;
 import static app.Theme.fb;
 import static app.Ui.*;
 
-/** Operator: tampilan tabel dengan simbol vektor, dialog modern, dan rekap data tercentang. */
+/** Operator: tampilan tabel dengan simbol vektor, dialog modern, dan nama otomatis kapital. */
 final class StudentsPage extends Page {
     private final JCheckBox selectAllBox = new JCheckBox();
     private JButton rekapBtn;
@@ -35,6 +33,29 @@ final class StudentsPage extends Page {
 
     StudentsPage(AppShell app) {
         super(app);
+    }
+
+    private static void forceUppercase(JTextField field) {
+        AbstractDocument doc = (AbstractDocument) field.getDocument();
+        doc.setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void insertString(FilterBypass fb, int offset, String text, AttributeSet attr)
+                    throws BadLocationException {
+                if (text != null) {
+                    text = text.toUpperCase();
+                }
+                super.insertString(fb, offset, text, attr);
+            }
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs)
+                    throws BadLocationException {
+                if (text != null) {
+                    text = text.toUpperCase();
+                }
+                super.replace(fb, offset, length, text, attrs);
+            }
+        });
     }
 
     @Override
@@ -506,7 +527,9 @@ final class StudentsPage extends Page {
         final JDialog[] dialogRef = new JDialog[1];
 
         PhotoPicker picker = new PhotoPicker();
-        JTextField namaField = new JTextField(isEdit ? editing.name : "");
+        JTextField namaField = new JTextField(isEdit ? editing.name.toUpperCase() : "");
+        forceUppercase(namaField);
+
         JComboBox<String> kelasBox = new JComboBox<>(new String[]{"10", "11", "12"});
         if (isEdit) {
             kelasBox.setSelectedItem(editing.studentClass);
@@ -543,7 +566,7 @@ final class StudentsPage extends Page {
 
         AppButton saveBtn = new AppButton(isEdit ? "Simpan Perubahan" : "Simpan Data Siswa", true);
         saveBtn.addActionListener(e -> {
-            String nama = namaField.getText().trim();
+            String nama = namaField.getText().trim().toUpperCase();
             String kelas = String.valueOf(kelasBox.getSelectedItem());
             String alamat = alamatField.getText().trim();
             String email = emailField.getText().trim();

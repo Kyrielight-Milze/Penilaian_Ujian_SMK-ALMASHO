@@ -593,6 +593,7 @@ final class Ui {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false;
+                
             }
         };
     }
