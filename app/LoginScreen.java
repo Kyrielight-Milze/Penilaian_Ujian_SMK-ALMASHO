@@ -204,15 +204,15 @@ final class LoginScreen extends Page {
         screen.add(split, BorderLayout.CENTER);
         return screen;
     }
-
-    /** Popup informasi lengkap saat tombol "Selengkapnya" diklik. */
+/** Popup informasi lengkap saat tombol "Selengkapnya" diklik (otomatis turun baris tanpa geser kanan & tanpa kotak kosong). */
     private void showMoreModal() {
         JPanel body = new JPanel();
         body.setOpaque(false);
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
 
+        // Lebar teks dikunci 515px agar otomatis turun baris (wrap) tanpa scrollbar horizontal
         JLabel p1 = new JLabel(
-            "<html><div style='line-height:1.6;'>"
+            "<html><div style='width:515px; line-height:1.55;'>"
             + "<b>Sistem Informasi Nilai &amp; Akademik (SINA)</b> merupakan layanan administrasi akademik "
             + "terpadu milik <b>SMK Al Malikus Sholeh</b> yang dirancang untuk menyatukan pengelolaan akun pendidik, "
             + "biodata peserta didik kelas 10 hingga 12, sinkronisasi tarik data Dapodik, pengaturan jadwal pelajaran, "
@@ -238,12 +238,38 @@ final class LoginScreen extends Page {
             "Memberikan transparansi informasi perkembangan belajar kepada guru, wali kelas, dan peserta didik."
         };
         for (String pt : points) {
-            JLabel item = new JLabel("<html><div style='line-height:1.5;'>\u2713 &nbsp;" + pt + "</div></html>");
+            JPanel row = new JPanel(new BorderLayout(10, 0));
+            row.setOpaque(false);
+            row.setAlignmentX(Component.LEFT_ALIGNMENT);
+            row.setBorder(BorderFactory.createEmptyBorder(0, 4, 9, 0));
+
+            // Ikon lingkaran centang vektor murni (menggantikan \u2713 agar tidak jadi kotak kosong)
+            JComponent checkBadge = new JComponent() {
+                @Override
+                public Dimension getPreferredSize() {
+                    return new Dimension(18, 20);
+                }
+
+                @Override
+                protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    quality(g2);
+                    g2.setColor(Theme.ACCENT);
+                    g2.fillOval(0, 2, 16, 16);
+                    g2.setColor(Color.WHITE);
+                    g2.setStroke(new BasicStroke(1.9f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    g2.drawPolyline(new int[]{4, 7, 12}, new int[]{10, 13, 7}, 3);
+                    g2.dispose();
+                }
+            };
+
+            JLabel item = new JLabel("<html><div style='width:485px; line-height:1.45;'>" + pt + "</div></html>");
             item.setFont(f(12.5f));
             item.setForeground(slate());
-            item.setBorder(BorderFactory.createEmptyBorder(0, 6, 8, 0));
-            item.setAlignmentX(Component.LEFT_ALIGNMENT);
-            body.add(item);
+
+            row.add(checkBadge, BorderLayout.WEST);
+            row.add(item, BorderLayout.CENTER);
+            body.add(row);
         }
 
         body.add(Box.createVerticalStrut(10));
@@ -255,7 +281,7 @@ final class LoginScreen extends Page {
         body.add(Box.createVerticalStrut(8));
 
         JLabel flow = new JLabel(
-            "<html><div style='line-height:1.55;'>"
+            "<html><div style='width:515px; line-height:1.55;'>"
             + "1. <b>Operator Sekolah</b> melakukan tarik data Dapodik, pemetaan mata pelajaran guru, dan jadwal kelas.<br>"
             + "2. <b>Bapak/Ibu Guru</b> masuk menggunakan akun terdaftar untuk menginput dan memperbarui nilai UTS.<br>"
             + "3. <b>Peserta Didik</b> dapat memantau biodata akademik serta jadwal pelajaran secara langsung.</div></html>"
@@ -269,6 +295,8 @@ final class LoginScreen extends Page {
         scroll.setBorder(null);
         scroll.setOpaque(false);
         scroll.getViewport().setOpaque(false);
+        scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.getVerticalScrollBar().setUnitIncrement(14);
 
         JDialog dlg = modalDialog(
             app.frame(),
@@ -278,8 +306,8 @@ final class LoginScreen extends Page {
             Theme.ACCENT,
             scroll,
             null,
-            620,
-            470
+            610,
+            490
         );
         dlg.setVisible(true);
     }
