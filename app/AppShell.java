@@ -15,6 +15,7 @@ import app.Components.*;
 import static app.Components.modalDialog;
 import static app.Theme.f;
 import static app.Theme.fb;
+import static app.Theme.quality;
 import static app.Ui.*;
 
 /** Kerangka utama aplikasi SINA: navigasi, informasi saat masuk, dan pergantian tema. */
@@ -81,21 +82,25 @@ final class AppShell {
         root.add(login.view(), "login");
         root.add(buildShell(), "shell");
 
-        register(new DashboardPage(this));
-        register(new TeachersPage(this));
-        register(new ProgressPage(this));
-        register(new StudentsPage(this));
-        register(new SchedulePage(this));
-        register(new SyncPage(this));
-        register(new GradesPage(this));
-        register(new MyDataPage(this));
-        register(new StudentSchedulePage(this));
+        register("dashboard", new DashboardPage(this));
+        register("teachers", new TeachersPage(this));
+        register("progress", new ProgressPage(this));
+        register("students", new StudentsPage(this));
+        register("schedule", new SchedulePage(this));
+        register("sync", new SyncPage(this));
+        register("grades", new GradesPage(this));
+        register("mydata", new MyDataPage(this));
+        register("myschedule", new StudentSchedulePage(this));
 
         frame.setContentPane(root);
         Theme.apply(root);
         login.refreshTheme();
         frame.getRootPane().setDefaultButton(login.defaultButton());
         frame.setLocationRelativeTo(null);
+    }
+
+    void start() {
+        show();
     }
 
     void show() {
@@ -114,9 +119,9 @@ final class AppShell {
         return activeRole;
     }
 
-    private void register(Page page) {
-        registry.put(page.key(), page);
-        pageContainer.add(page.view(), page.key());
+    private void register(String key, Page page) {
+        registry.put(key, page);
+        pageContainer.add(page.view(), key);
     }
 
     private JPanel buildShell() {
@@ -130,7 +135,7 @@ final class AppShell {
         return shell;
     }
 
-    /** Masuk ke halaman utama dan langsung menampilkan dialog Informasi Kelengkapan Data (ala SS 261). */
+    /** Masuk ke halaman utama dan langsung menampilkan dialog Informasi Kelengkapan Data. */
     void enter(String role, String username) {
         activeRole = role;
         activeUsername = username;
@@ -151,14 +156,13 @@ final class AppShell {
         DataStore.reload();
         int totalGuru = DataStore.TEACHERS.size();
         int totalSiswa = DataStore.STUDENTS.size();
-        int totalJadwal = DataStore.SCHEDULES.size();
         int guruMapelKosong = 0;
         for (TeacherRecord t : DataStore.TEACHERS.values()) {
             if (t.subjects.isEmpty()) {
                 guruMapelKosong++;
             }
         }
-        int totalResidu = guruMapelKosong;
+        int totalResidu = guruMapelKosong + (totalSiswa == 0 ? 1 : 0);
 
         JPanel body = p(new BorderLayout(0, 12));
 
@@ -178,8 +182,8 @@ final class AppShell {
         rowsPanel.add(makeCheckRow("Pendaftaran Akun Guru (" + totalGuru + " guru terdaftar)", totalGuru > 0));
         rowsPanel.add(makeCheckRow("Pemetaan Mata Pelajaran Guru", totalGuru > 0 && guruMapelKosong == 0));
         rowsPanel.add(makeCheckRow("Pendaftaran Data Peserta Didik (" + totalSiswa + " siswa)", totalSiswa > 0));
-        rowsPanel.add(makeCheckRow("Pengaturan Jadwal Pelajaran (" + totalJadwal + " sesi aktif)", totalJadwal > 0));
-        rowsPanel.add(makeCheckRow("Sinkronisasi Tarik Data Dapodik & Validasi Rombel", totalSiswa > 0 && totalGuru > 0));
+        rowsPanel.add(makeCheckRow("Pengaturan Jadwal Pelajaran & Rombel", totalGuru > 0 && totalSiswa > 0));
+        rowsPanel.add(makeCheckRow("Sinkronisasi Tarik Data Dapodik", totalSiswa > 0 && totalGuru > 0));
         checkCard.add(rowsPanel, BorderLayout.CENTER);
 
         // 2. Rekap residu data
@@ -198,17 +202,17 @@ final class AppShell {
         residuCard.add(residuHead, BorderLayout.NORTH);
 
         JPanel residuList = p(new GridLayout(0, 1, 0, 0));
-        residuList.add(makeCountRow("Residu Guru Belum Memiliki Mata Pelajaran", guruMapelKosong));
-        residuList.add(makeCountRow("Residu Rombel / Kelas Kosong", totalSiswa == 0 ? 1 : 0));
+        residuList.add(makeCountRow("Residu Guru Belum Memiliki Mata Pelajaran", guruMapelKosong, false));
+        residuList.add(makeCountRow("Residu Peserta Didik Belum Terdaftar", totalSiswa == 0 ? 1 : 0, false));
         residuList.add(makeCountRow("Total Data Residu", totalResidu, true));
         residuCard.add(residuList, BorderLayout.CENTER);
 
-        // 3. Banner peringatan bawah (kuning lembut ala SS 261)
+        // 3. Banner peringatan bawah
         JPanel warnBox = new JPanel(new BorderLayout(8, 0)) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                Theme.quality(g2);
+                quality(g2);
                 g2.setColor(Theme.dark ? new Color(120, 80, 10, 90) : new Color(254, 243, 199));
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
                 g2.setColor(new Color(245, 158, 11, 140));
@@ -268,7 +272,7 @@ final class AppShell {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
-                Theme.quality(g2);
+                quality(g2);
                 g2.setColor(ok ? new Color(22, 163, 74) : new Color(234, 179, 8));
                 g2.fillOval(1, 1, 20, 20);
                 g2.setColor(Color.WHITE);
@@ -286,10 +290,6 @@ final class AppShell {
         return row;
     }
 
-    private JPanel makeCountRow(String text, int count) {
-        return makeCountRow(text, count, false);
-    }
-
     private JPanel makeCountRow(String text, int count, boolean bold) {
         JPanel row = p(new BorderLayout(12, 0));
         row.setBorder(BorderFactory.createCompoundBorder(
@@ -299,6 +299,10 @@ final class AppShell {
         row.add(label(text, bold ? fb(12.5f) : f(12.5f), "title"), BorderLayout.WEST);
         row.add(label(String.valueOf(count), fb(12.5f), count == 0 ? "muted" : "gold"), BorderLayout.EAST);
         return row;
+    }
+
+    void refreshUser() {
+        refreshIdentity();
     }
 
     void refreshIdentity() {
@@ -311,6 +315,15 @@ final class AppShell {
         avatarIcon.background = avatarColor(displayName);
         avatarLabel.repaint();
         updateGreeting();
+    }
+
+    private static String firstWord(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "Pengguna";
+        }
+        String clean = name.trim();
+        int space = clean.indexOf(' ');
+        return space > 0 ? clean.substring(0, space) : clean;
     }
 
     void updateGreeting() {
