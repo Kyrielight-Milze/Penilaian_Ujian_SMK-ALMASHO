@@ -1,12 +1,8 @@
 package app;
 
-import app.Components.*;
-import static app.Components.modalDialog; // <-- tambahkan baris ini
-import static app.Theme.f;
-import static app.Theme.fb;
-import static app.Ui.*;
 import javax.swing.*;
 import javax.swing.table.*;
+import javax.swing.text.*;
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.*;
@@ -14,11 +10,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import app.Components.*;
+import static app.Components.modalDialog;
 import static app.Theme.f;
 import static app.Theme.fb;
 import static app.Ui.*;
 
-/** Operator: kelola akun guru dengan ikon vektor dan dialog modern. */
+/** Operator: kelola akun guru dengan ikon vektor, dialog modern, dan nama kapital sebelum tanda koma. */
 final class TeachersPage extends Page {
     private final JCheckBox selectAllBox = new JCheckBox();
     private JButton rekapBtn;
@@ -35,6 +32,49 @@ final class TeachersPage extends Page {
 
     TeachersPage(AppShell app) {
         super(app);
+    }
+
+    /** Kapitalkan teks sebelum tanda koma pertama, dan biarkan format gelar setelah koma apa adanya. */
+    private static String formatTeacherName(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        int comma = raw.indexOf(',');
+        if (comma < 0) {
+            return raw.toUpperCase();
+        }
+        return raw.substring(0, comma).toUpperCase() + raw.substring(comma);
+    }
+
+    private static void forceUppercaseBeforeComma(JTextField field) {
+        AbstractDocument doc = (AbstractDocument) field.getDocument();
+        doc.setDocumentFilter(new DocumentFilter() {
+            @Override
+            public void insertString(FilterBypass fb, int offset, String text, AttributeSet attr)
+                    throws BadLocationException {
+                if (text != null) {
+                    String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+                    int commaIdx = current.indexOf(',');
+                    if (commaIdx < 0 || offset <= commaIdx) {
+                        text = formatTeacherName(text);
+                    }
+                }
+                super.insertString(fb, offset, text, attr);
+            }
+
+            @Override
+            public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs)
+                    throws BadLocationException {
+                if (text != null) {
+                    String current = fb.getDocument().getText(0, fb.getDocument().getLength());
+                    int commaIdx = current.indexOf(',');
+                    if (commaIdx < 0 || offset <= commaIdx) {
+                        text = formatTeacherName(text);
+                    }
+                }
+                super.replace(fb, offset, length, text, attrs);
+            }
+        });
     }
 
     @Override
@@ -482,7 +522,10 @@ final class TeachersPage extends Page {
         final JDialog[] dialogRef = new JDialog[1];
 
         PhotoPicker picker = new PhotoPicker();
-        JTextField nameField = new JTextField(isEdit ? editing.name : "");
+        JTextField nameField = new JTextField(isEdit ? formatTeacherName(editing.name) : "");
+        nameField.setToolTipText("Contoh: AHMAD SYARIFUL ANAM, S.Pd.");
+        forceUppercaseBeforeComma(nameField);
+
         JTextField userField = new JTextField(isEdit ? editing.username : "");
         JPasswordField passField = new JPasswordField();
         SubjectPicker subjectPicker = new SubjectPicker();
@@ -497,7 +540,7 @@ final class TeachersPage extends Page {
 
         JPanel form = p(new GridBagLayout());
         addRow(form, 0, "Foto profil", picker);
-        addRow(form, 1, "Nama guru", nameField);
+        addRow(form, 1, "Nama & gelar guru", nameField);
         addRow(form, 2, "Username (Gmail)", userField);
         addRow(form, 3, isEdit ? "Password baru (opsional)" : "Password guru", createPasswordControl(passField));
 
@@ -524,7 +567,7 @@ final class TeachersPage extends Page {
 
         AppButton saveBtn = new AppButton(isEdit ? "Simpan Perubahan" : "Tambah Akun Guru", true);
         saveBtn.addActionListener(e -> {
-            String nama = nameField.getText().trim();
+            String nama = formatTeacherName(nameField.getText().trim());
             String user = userField.getText().trim();
             String pass = new String(passField.getPassword());
             List<String> subjects = subjectPicker.getSubjects();
@@ -576,7 +619,7 @@ final class TeachersPage extends Page {
             app.frame(),
             isEdit ? "EDIT AKUN GURU" : "AKUN GURU BARU",
             isEdit ? "Ubah Data Guru" : "Tambah Akun Guru",
-            isEdit ? EDIT_HINT : "Lengkapi biodata, akses login Gmail, dan mata pelajaran guru",
+            isEdit ? EDIT_HINT : "Pisahkan nama dan gelar dengan koma (misal: AHMAD, S.Pd.)",
             isEdit ? Theme.GOLD : Theme.ACCENT,
             scroll,
             btnRow,
