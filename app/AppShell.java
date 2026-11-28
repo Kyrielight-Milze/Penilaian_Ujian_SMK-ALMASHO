@@ -5,11 +5,14 @@ import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.MouseMotionListener;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.prefs.Preferences;
 
 import app.Components.*;
 import static app.Components.modalDialog;
@@ -18,8 +21,20 @@ import static app.Theme.fb;
 import static app.Theme.quality;
 import static app.Ui.*;
 
-/** Kerangka utama aplikasi SINA: navigasi, informasi saat masuk, dan pergantian tema. */
+/** Kerangka utama aplikasi SINA: navigasi, informasi kelengkapan data saat masuk, dan pergantian tema. */
 final class AppShell {
+    private static final Preferences APPLY_PREFS = Preferences.userNodeForPackage(AppShell.class);
+
+    /** Menyimpan status apakah suatu bagian data sudah di-apply (true = ceklist, false = silang). */
+    static void setApplied(String key, boolean applied) {
+        APPLY_PREFS.putBoolean("applied_" + key, applied);
+    }
+
+    /** Mengecek status apply (default false = silang merah jika belum pernah di-apply). */
+    static boolean isApplied(String key) {
+        return APPLY_PREFS.getBoolean("applied_" + key, false);
+    }
+
     private static final class NavEntry {
         final NavButton button;
         final List<NavButton> children = new ArrayList<>();
@@ -136,7 +151,7 @@ final class AppShell {
         return shell;
     }
 
-    /** Masuk ke halaman utama dan langsung menampilkan dialog Informasi Kelengkapan Data. */
+    /** Masuk ke halaman utama dan menampilkan dialog Informasi Kelengkapan Data. */
     void enter(String role, String username) {
         activeRole = role;
         activeUsername = username;
@@ -152,7 +167,7 @@ final class AppShell {
         });
     }
 
-    /** Dialog Informasi Ceklis Kelengkapan Data (mengecek otomatis jadwal Senin - Jumat). */
+    /** Dialog Informasi Kelengkapan Data: Ceklist hijau jika sudah di-apply, Silang merah jika belum. */
     void showLoginInfoDialog() {
         DataStore.reload();
         int totalGuru = DataStore.TEACHERS.size();
@@ -164,7 +179,6 @@ final class AppShell {
             }
         }
 
-        // Cek kelengkapan jadwal hari Senin - Jumat
         String[] wajibHari = {"Senin", "Selasa", "Rabu", "Kamis", "Jumat"};
         List<String> hariTerisi = new ArrayList<>();
         for (String hari : wajibHari) {
@@ -175,15 +189,20 @@ final class AppShell {
                 }
             }
         }
-        boolean jadwalLengkap = hariTerisi.size() == wajibHari.length;
-        String noteJadwal = jadwalLengkap ? null
-            : (hariTerisi.isEmpty() ? "(Belum diset operator)" : "(Hanya: " + String.join(", ", hariTerisi) + ")");
 
-        JPanel stack = new JPanel();
-        stack.setOpaque(false);
-        stack.setLayout(new BoxLayout(stack, BoxLayout.Y_AXIS));
+        boolean guruApplied = totalGuru > 0 && isApplied("teachers");
+        boolean mapelApplied = totalGuru > 0 && guruMapelKosong == 0 && isApplied("subjects");
+        boolean siswaApplied = totalSiswa > 0 && isApplied("students");
+        boolean jadwalApplied = hariTerisi.size() == wajibHari.length && isApplied("schedule");
+        boolean dapodikApplied = totalSiswa > 0 && totalGuru > 0 && isApplied("sync");
 
-        // 1. Kartu Ceklis Kelengkapan Data Akademik
+        String noteJadwal = jadwalApplied ? "Sudah Apply"
+            : (hariTerisi.isEmpty() ? "Belum Apply" : "Belum Apply (" + String.join(", ", hariTerisi) + ")");
+
+        JPanel content = new JPanel(new BorderLayout(0, 14));
+        content.setOpaque(false);
+
+        // 1. Kartu Status Kelengkapan & Apply Data Akademik
         JPanel checkCard = makeInfoCard();
         JPanel checkHeader = new JPanel(new BorderLayout());
         checkHeader.setOpaque(false);
@@ -191,23 +210,27 @@ final class AppShell {
             BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.border()),
             BorderFactory.createEmptyBorder(12, 16, 12, 16)
         ));
-        JLabel cTitle = new JLabel("Ceklis Kelengkapan Data Akademik", SwingConstants.CENTER);
+        JLabel cTitle = new JLabel("Status Kelengkapan & Apply Data Akademik", SwingConstants.CENTER);
         cTitle.setFont(fb(13.5f));
         cTitle.setForeground(Theme.text());
         checkHeader.add(cTitle, BorderLayout.CENTER);
         checkCard.add(checkHeader);
 
-        checkCard.add(makeCheckRow("Pendaftaran Akun Guru (" + totalGuru + " guru terdaftar)", null, totalGuru > 0, false));
-        checkCard.add(makeCheckRow("Pemetaan Mata Pelajaran Guru", null, totalGuru > 0 && guruMapelKosong == 0, false));
-        checkCard.add(makeCheckRow("Pendaftaran Data Peserta Didik (" + totalSiswa + " siswa)", null, totalSiswa > 0, false));
-        checkCard.add(makeCheckRow("Pengaturan Jadwal Ujian & Rombel", noteJadwal, jadwalLengkap, false));
-        checkCard.add(makeCheckRow("Sinkronisasi Tarik Data Dapodik", null, totalSiswa > 0 && totalGuru > 0, true));
+        checkCard.add(makeCheckRow("Pendaftaran Akun Guru (" + totalGuru + " guru terdaftar)",
+            guruApplied ? "Sudah Apply" : "Belum Apply", guruApplied, false));
+        checkCard.add(makeCheckRow("Pemetaan Mata Pelajaran Guru",
+            mapelApplied ? "Sudah Apply" : "Belum Apply", mapelApplied, false));
+        checkCard.add(makeCheckRow("Pendaftaran Data Peserta Didik (" + totalSiswa + " siswa)",
+            siswaApplied ? "Sudah Apply" : "Belum Apply", siswaApplied, false));
+        checkCard.add(makeCheckRow("Pengaturan Jadwal Ujian & Rombel",
+            noteJadwal, jadwalApplied, false));
+        checkCard.add(makeCheckRow("Sinkronisasi Tarik Data Dapodik",
+            dapodikApplied ? "Sudah Apply" : "Belum Apply", dapodikApplied, true));
 
-        stack.add(checkCard);
-        stack.add(Box.createVerticalStrut(14));
+        content.add(checkCard, BorderLayout.NORTH);
 
-        // 2. Kotak Keterangan Kuning Lembut
-        JPanel warnBox = new JPanel(new BorderLayout(10, 0)) {
+        // 2. Kotak Keterangan Responsif (bersih tanpa kotak simbol & tanpa garis input)
+        JPanel warnBox = new JPanel(new BorderLayout(12, 0)) {
             @Override
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -220,8 +243,7 @@ final class AppShell {
             }
         };
         warnBox.setOpaque(false);
-        warnBox.setAlignmentX(Component.LEFT_ALIGNMENT);
-        warnBox.setBorder(BorderFactory.createEmptyBorder(11, 14, 11, 14));
+        warnBox.setBorder(BorderFactory.createEmptyBorder(12, 14, 12, 14));
 
         JComponent warnIcon = new JComponent() {
             @Override
@@ -243,31 +265,59 @@ final class AppShell {
         };
         JPanel iconHold = new JPanel(new BorderLayout());
         iconHold.setOpaque(false);
+        iconHold.setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
         iconHold.add(warnIcon, BorderLayout.NORTH);
 
-        JLabel warnText = new JLabel(
-            "<html><div style='width:515px; line-height:1.45;'><b>Keterangan:</b> Pastikan seluruh ceklis kelengkapan "
-            + "data berstatus hijau sebelum melakukan pengisian nilai UTS maupun pencetakan laporan.</div></html>"
+        JTextArea warnText = new JTextArea(
+            "Keterangan: Status ceklist hijau menandakan data sudah di-apply, sedangkan silang merah "
+            + "menandakan data belum di-apply. Pastikan seluruh data berstatus ceklist hijau sebelum pengisian nilai UTS "
+            + "maupun pencetakan laporan."
         );
+        warnText.setEditable(false);
+        warnText.setFocusable(false);
+        warnText.setOpaque(false);
+        warnText.setLineWrap(true);
+        warnText.setWrapStyleWord(true);
         warnText.setFont(f(12));
-        warnText.setForeground(Theme.dark ? new Color(253, 230, 138) : new Color(146, 64, 14));
 
         warnBox.add(iconHold, BorderLayout.WEST);
         warnBox.add(warnText, BorderLayout.CENTER);
-        stack.add(warnBox);
+        content.add(warnBox, BorderLayout.CENTER);
 
         JDialog dlg = modalDialog(
             frame,
             "INFORMASI SISTEM",
             "Informasi Kelengkapan Data",
-            "Ringkasan kesiapan data SINA SMK Al Malikus Sholeh saat akses masuk",
+            "Ringkasan kesiapan & status Apply data SINA SMK Al Malikus Sholeh",
             Theme.ACCENT,
-            stack,
+            content,
             null,
-            630,
-            465
+            640,
+            540
         );
+        warnText.setBorder(BorderFactory.createEmptyBorder());
+        warnText.setBackground(new Color(0, 0, 0, 0));
+        warnText.setForeground(Theme.dark ? new Color(253, 230, 138) : new Color(146, 64, 14));
+        lockDialogPosition(dlg.getContentPane());
         dlg.setVisible(true);
+    }
+
+    /** Menghapus kursor geser dan listener drag agar posisi dialog terkunci tetap di tengah. */
+    private static void lockDialogPosition(Container root) {
+        for (Component comp : root.getComponents()) {
+            if (!(comp instanceof AbstractButton)) {
+                comp.setCursor(Cursor.getDefaultCursor());
+                for (MouseListener ml : comp.getMouseListeners()) {
+                    comp.removeMouseListener(ml);
+                }
+                for (MouseMotionListener mml : comp.getMouseMotionListeners()) {
+                    comp.removeMouseMotionListener(mml);
+                }
+            }
+            if (comp instanceof Container) {
+                lockDialogPosition((Container) comp);
+            }
+        }
     }
 
     private JPanel makeInfoCard() {
@@ -285,11 +335,10 @@ final class AppShell {
         };
         panel.setOpaque(false);
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
         return panel;
     }
 
-    private JPanel makeCheckRow(String text, String shortNote, boolean ok, boolean last) {
+    private JPanel makeCheckRow(String text, String statusNote, boolean applied, boolean last) {
         JPanel row = new JPanel(new BorderLayout(10, 0));
         row.setOpaque(false);
         row.setBorder(BorderFactory.createCompoundBorder(
@@ -305,10 +354,12 @@ final class AppShell {
         JPanel rightGroup = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         rightGroup.setOpaque(false);
 
-        if (shortNote != null && !shortNote.isEmpty()) {
-            JLabel noteLbl = new JLabel(shortNote);
-            noteLbl.setFont(f(11));
-            noteLbl.setForeground(new Color(217, 119, 6));
+        if (statusNote != null && !statusNote.isEmpty()) {
+            JLabel noteLbl = new JLabel(statusNote);
+            noteLbl.setFont(fb(11));
+            noteLbl.setForeground(applied
+                ? new Color(22, 163, 74)
+                : (Theme.dark ? new Color(248, 113, 113) : new Color(220, 38, 38)));
             rightGroup.add(noteLbl);
         }
 
@@ -330,19 +381,20 @@ final class AppShell {
                 int d = 20;
                 int x = (getWidth() - d) / 2;
                 int y = (getHeight() - d) / 2;
-                g2.setColor(ok ? new Color(22, 163, 74) : new Color(217, 119, 6));
+                g2.setColor(applied ? new Color(22, 163, 74) : new Color(220, 38, 38));
                 g2.fillOval(x, y, d, d);
                 g2.setColor(Color.WHITE);
-                g2.setStroke(new BasicStroke(2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                if (ok) {
+                g2.setStroke(new BasicStroke(2.1f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                if (applied) {
                     g2.drawPolyline(new int[]{x + 5, x + 9, x + 15}, new int[]{y + 10, y + 14, y + 6}, 3);
                 } else {
-                    g2.drawLine(x + 10, y + 5, x + 10, y + 11);
-                    g2.fillOval(x + 9, y + 13, 2, 2);
+                    g2.drawLine(x + 6, y + 6, x + 14, y + 14);
+                    g2.drawLine(x + 14, y + 6, x + 6, y + 14);
                 }
                 g2.dispose();
             }
         };
+        badge.setToolTipText(applied ? "Sudah di-apply" : "Belum di-apply");
         rightGroup.add(badge);
         row.add(rightGroup, BorderLayout.EAST);
         return row;
